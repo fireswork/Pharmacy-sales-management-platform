@@ -1,0 +1,30 @@
+{
+  "name": "drug",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "prettier --write src/"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
+    "animate.css": "^4.1.1",
+    "ant-design-vue": "^4.2.6",
+    "dayjs": "^1.11.13",
+    "echarts": "^5.6.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vitejs/plugin-vue-jsx": "^4.1.1",
+    "less": "^4.2.2",
+    "prettier": "3.5.3",
+    "vite": "^6.2.1",
+    "vite-plugin-vue-devtools": "^7.7.2"
+  },
+  "packageManager": "pnpm@8.15.4+sha1.c85a4305534f76d461407b59277b954bac97b5c4"
+}
