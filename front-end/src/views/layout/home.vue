@@ -24,13 +24,13 @@
             <a-avatar class="user-avatar">
               <template #icon><UserOutlined /></template>
             </a-avatar>
-            <span class="username">{{ userName }}</span>
+            <span class="username">{{ userName || '未登录' }}</span>
             <DownOutlined />
           </a>
           <template #overlay>
             <a-menu>
               <a-menu-item key="profile">
-                <router-link to="/home/user/profile">个人中心</router-link>
+                <router-link to="/home/user/profile">个人信息</router-link>
               </a-menu-item>
               <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
             </a-menu>
@@ -63,13 +63,17 @@
             <template #icon><TeamOutlined /></template>
             <router-link to="/home/supplierManagement">供应商管理</router-link>
           </a-menu-item>
-          <a-menu-item key="employeeManagement">
+          <a-menu-item key="storeManagement">
             <template #icon><ShopOutlined /></template>
-            <router-link to="/home/store">分店管理</router-link>
+            <router-link to="/home/storeManagement">分店管理</router-link>
           </a-menu-item>
           <a-menu-item key="memberManagement">
             <template #icon><CrownOutlined /></template>
             <router-link to="/home/memberManagement">会员管理</router-link>
+          </a-menu-item>
+          <a-menu-item key="employeeManagement">
+            <template #icon><ShopOutlined /></template>
+            <router-link to="/home/employeeManagement">员工管理</router-link>
           </a-menu-item>
           <a-menu-item key="order">
             <template #icon><OrderedListOutlined /></template>
@@ -92,15 +96,12 @@
             <template #icon><UserOutlined /></template>
             <template #title>个人中心</template>
             <a-menu-item key="profile">
-              <template #icon><IdcardOutlined /></template>
               <router-link to="/home/user/profile">个人信息</router-link>
             </a-menu-item>
-            <a-menu-item key="address">
-              <template #icon><EnvironmentOutlined /></template>
+            <a-menu-item key="userAddress">
               <router-link to="/home/user/address">收货地址</router-link>
             </a-menu-item>
-            <a-menu-item key="orders">
-              <template #icon><UnorderedListOutlined /></template>
+            <a-menu-item key="userOrders">
               <router-link to="/home/user/orders">我的订单</router-link>
             </a-menu-item>
             <a-menu-item key="favorites">
@@ -123,8 +124,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import axios from '@/utils/axios'
 import {
   DownOutlined,
   UserOutlined,
@@ -151,7 +153,23 @@ const router = useRouter()
 const selectedKeys = ref(['products'])
 const openKeys = ref(['user'])
 
-const userName = ref('用户名') // 这里应该从用户状态获取
+// 用户信息相关
+const userName = ref('')
+const userInfo = ref(null)
+
+// 获取用户信息的方法
+const getUserInfo = async () => {
+  const response = await axios.get('/user')
+  if (response.code === 200) {
+    userInfo.value = response.data
+    userName.value = response.data.username
+  }
+}
+
+// 在组件挂载时获取用户信息
+onMounted(() => {
+  getUserInfo()
+})
 
 // 添加药店选择相关数据
 const selectedStore = ref(null)
@@ -178,7 +196,7 @@ watch(
 )
 
 const handleLogout = () => {
-  localStorage.removeItem('token')
+  localStorage.removeItem('access_token')  // 更新为正确的 token key
   message.success('退出成功')
   router.push('/login')
 }

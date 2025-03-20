@@ -11,23 +11,23 @@
             allow-clear
           />
           <a-select
-            v-model:value="searchForm.level"
-            style="width: 120px"
-            placeholder="会员等级"
-            allow-clear
-          >
-            <a-select-option v-for="level in memberLevels" :key="level.value" :value="level.value">
-              {{ level.label }}
-            </a-select-option>
-          </a-select>
-          <a-select
             v-model:value="searchForm.status"
             style="width: 120px"
             placeholder="会员状态"
             allow-clear
           >
-            <a-select-option value="active">正常</a-select-option>
-            <a-select-option value="inactive">已停用</a-select-option>
+            <a-select-option value="正常">正常</a-select-option>
+            <a-select-option value="已停用">已停用</a-select-option>
+          </a-select>
+          <a-select
+            v-model:value="searchForm.storeId"
+            style="width: 180px"
+            placeholder="所属门店"
+            allow-clear
+          >
+            <a-select-option v-for="store in storeOptions" :key="store.id" :value="store.id">
+              {{ store.name }}
+            </a-select-option>
           </a-select>
           <a-button type="primary" @click="handleSearch">
             <template #icon><SearchOutlined /></template>
@@ -49,37 +49,36 @@
         :columns="columns"
         :data-source="memberList"
         :pagination="pagination"
-        :row-key="record => record.id"
+        :loading="loading"
+        :row-key="record => record.username"
         bordered
+        @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <!-- 会员等级列 -->
-          <template v-if="column.key === 'level'">
-            <a-tag :color="getMemberLevelColor(record.level)">
-              {{ getMemberLevelText(record.level) }}
+          <template v-if="column.key === 'memberLevel'">
+            <a-tag :color="getMemberLevelColor(record.member.memberLevel)">
+              {{ getMemberLevelText(record.member.memberLevel) }}
             </a-tag>
           </template>
 
           <!-- 状态列 -->
           <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 'active' ? 'success' : 'default'">
-              {{ record.status === 'active' ? '正常' : '已停用' }}
+            <a-tag :color="record.member.status === '正常' ? 'success' : 'default'">
+              {{ record.member.status }}
             </a-tag>
           </template>
           
           <!-- 操作列 -->
           <template v-if="column.key === 'action'">
             <a-space>
-              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" @click="handleViewPoints(record)">积分记录</a-button>
-              <a-button type="link" size="small" @click="handleViewOrders(record)">消费记录</a-button>
               <a-button 
                 type="link" 
                 size="small" 
-                :danger="record.status === 'active'"
+                :danger="record.member.status === '正常'"
                 @click="handleStatusChange(record)"
               >
-                {{ record.status === 'active' ? '停用' : '启用' }}
+                {{ record.member.status === '正常' ? '停用' : '启用' }}
               </a-button>
             </a-space>
           </template>
@@ -105,20 +104,12 @@
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 16 }"
       >
-        <a-form-item label="会员姓名" name="name" required>
-          <a-input v-model:value="formData.name" placeholder="请输入会员姓名" />
+        <a-form-item label="会员姓名" name="username" required>
+          <a-input v-model:value="formData.username" placeholder="请输入会员姓名" />
         </a-form-item>
 
-        <a-form-item label="手机号码" name="phone" required>
-          <a-input v-model:value="formData.phone" placeholder="请输入手机号码" />
-        </a-form-item>
-
-        <a-form-item label="会员等级" name="level" required>
-          <a-select v-model:value="formData.level" placeholder="请选择会员等级">
-            <a-select-option v-for="level in memberLevels" :key="level.value" :value="level.value">
-              {{ level.label }}
-            </a-select-option>
-          </a-select>
+        <a-form-item label="手机号码" name="phoneNumber" required>
+          <a-input v-model:value="formData.phoneNumber" placeholder="请输入手机号码" />
         </a-form-item>
 
         <a-form-item label="生日" name="birthday">
@@ -133,20 +124,11 @@
           <a-input v-model:value="formData.email" placeholder="请输入邮箱地址" />
         </a-form-item>
 
-        <a-form-item label="地址" name="address">
-          <a-textarea
-            v-model:value="formData.address"
-            :rows="2"
-            placeholder="请输入详细地址"
-          />
-        </a-form-item>
-
-        <a-form-item label="备注" name="remark">
-          <a-textarea
-            v-model:value="formData.remark"
-            :rows="2"
-            placeholder="请输入备注信息"
-          />
+        <a-form-item label="性别" name="gender">
+          <a-radio-group v-model:value="formData.gender">
+            <a-radio value="male">男</a-radio>
+            <a-radio value="female">女</a-radio>
+          </a-radio-group>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -160,9 +142,9 @@
     >
       <div class="points-summary">
         <a-descriptions :column="3">
-          <a-descriptions-item label="当前积分">{{ currentMember.points }}</a-descriptions-item>
-          <a-descriptions-item label="累计积分">{{ currentMember.totalPoints }}</a-descriptions-item>
-          <a-descriptions-item label="已使用积分">{{ currentMember.usedPoints }}</a-descriptions-item>
+          <a-descriptions-item label="当前积分">{{ currentMember.points || 0 }}</a-descriptions-item>
+          <a-descriptions-item label="累计积分">{{ currentMember.totalPoints || 0 }}</a-descriptions-item>
+          <a-descriptions-item label="已使用积分">{{ currentMember.usedPoints || 0 }}</a-descriptions-item>
         </a-descriptions>
       </div>
       <a-table
@@ -190,9 +172,9 @@
     >
       <div class="orders-summary">
         <a-descriptions :column="3">
-          <a-descriptions-item label="消费总额">¥{{ currentMember.totalAmount }}</a-descriptions-item>
-          <a-descriptions-item label="订单总数">{{ currentMember.orderCount }}</a-descriptions-item>
-          <a-descriptions-item label="最近消费">{{ currentMember.lastOrderTime }}</a-descriptions-item>
+          <a-descriptions-item label="消费总额">¥{{ currentMember.totalSpending || 0 }}</a-descriptions-item>
+          <a-descriptions-item label="订单总数">{{ currentMember.orderCount || 0 }}</a-descriptions-item>
+          <a-descriptions-item label="最近消费">{{ currentMember.lastOrderTime || '无' }}</a-descriptions-item>
         </a-descriptions>
       </div>
       <a-table
@@ -214,84 +196,106 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  SearchOutlined,
-  ReloadOutlined,
-  PlusOutlined
+import { 
+  SearchOutlined, 
+  ReloadOutlined, 
+  PlusOutlined 
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
-
-// 会员等级配置
-const memberLevels = [
-  { value: 'bronze', label: '普通会员', color: '' },
-  { value: 'silver', label: '白银会员', color: 'cyan' },
-  { value: 'gold', label: '黄金会员', color: 'gold' },
-  { value: 'platinum', label: '铂金会员', color: 'purple' },
-  { value: 'diamond', label: '钻石会员', color: 'blue' }
-]
+import axios from '@/utils/axios'
 
 // 搜索表单
 const searchForm = ref({
   keyword: '',
   level: undefined,
-  status: undefined
+  status: undefined,
+  storeId: undefined
 })
 
-// 表格列定义
+// 会员等级配置
+const memberLevels = [
+  { value: 'bronze', label: '普通会员', color: '#d9d9d9' },
+  { value: 'silver', label: '白银会员', color: '#bfbfbf' },
+  { value: 'gold', label: '黄金会员', color: '#faad14' },
+  { value: 'platinum', label: '铂金会员', color: '#1890ff' },
+  { value: 'diamond', label: '钻石会员', color: '#722ed1' }
+]
+
+// 表格列配置
 const columns = [
   {
     title: '会员编号',
-    dataIndex: 'code',
-    width: 120
+    dataIndex: ['member', 'memberId'],
+    width: 120,
   },
   {
     title: '会员姓名',
-    dataIndex: 'name',
-    width: 120
+    dataIndex: ['member', 'name'],
+    width: 120,
   },
   {
-    title: '手机号码',
-    dataIndex: 'phone',
-    width: 120
+    title: '手机号',
+    dataIndex: ['member', 'phoneNumber'],
+    width: 150,
+  },
+  {
+    title: '邮箱',
+    dataIndex: ['member', 'email'],
+    width: 180,
+  },
+  {
+    title: '性别',
+    dataIndex: ['member', 'gender'],
+    width: 80,
+    customRender: ({ text }) => {
+      if (text === 'male') return '男'
+      if (text === 'female') return '女'
+      return '未知'
+    }
   },
   {
     title: '会员等级',
-    dataIndex: 'level',
-    key: 'level',
-    width: 100
+    dataIndex: ['member', 'memberLevel'],
+    key: 'memberLevel',
+    width: 120,
   },
   {
     title: '当前积分',
-    dataIndex: 'points',
-    width: 100
+    dataIndex: ['member', 'points'],
+    width: 120,
   },
   {
     title: '累计消费',
-    dataIndex: 'totalAmount',
-    width: 120
+    dataIndex: ['member', 'totalSpending'],
+    width: 120,
+    customRender: ({ text }) => {
+      return text ? `¥${text.toFixed(2)}` : '¥0.00'
+    }
   },
   {
     title: '注册时间',
-    dataIndex: 'registerTime',
-    width: 180
+    dataIndex: ['member', 'registrationTime'],
+    width: 200,
+    customRender: ({ text }) => {
+      return text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '无'
+    }
   },
   {
     title: '状态',
-    dataIndex: 'status',
+    dataIndex: ['member', 'status'],
     key: 'status',
-    width: 100
+    width: 100,
   },
   {
     title: '操作',
     key: 'action',
-    fixed: 'right',
-    width: 280
+    width: 200,
   }
 ]
 
-// 积分记录列定义
+// 积分记录列配置
 const pointsColumns = [
   {
     title: '时间',
@@ -307,7 +311,7 @@ const pointsColumns = [
   {
     title: '积分变动',
     dataIndex: 'points',
-    width: 100
+    width: 120
   },
   {
     title: '来源/用途',
@@ -320,22 +324,25 @@ const pointsColumns = [
   }
 ]
 
-// 订单记录列定义
+// 订单记录列配置
 const orderColumns = [
   {
     title: '订单编号',
-    dataIndex: 'code',
-    width: 120
+    dataIndex: 'orderNo',
+    width: 180
   },
   {
     title: '下单时间',
-    dataIndex: 'createTime',
+    dataIndex: 'orderTime',
     width: 180
   },
   {
     title: '订单金额',
     dataIndex: 'amount',
-    width: 120
+    width: 120,
+    customRender: ({ text }) => {
+      return `¥${text}`
+    }
   },
   {
     title: '支付方式',
@@ -356,27 +363,18 @@ const orderColumns = [
 ]
 
 // 会员列表数据
-const memberList = ref([
-  {
-    id: 1,
-    code: 'M001',
-    name: '张三',
-    phone: '13800138000',
-    level: 'gold',
-    points: 1000,
-    totalAmount: 5000,
-    registerTime: '2024-01-01 10:00:00',
-    status: 'active'
-  },
-  // ... 其他会员数据
-])
+const memberList = ref([])
+const loading = ref(false)
 
 // 分页配置
-const pagination = {
-  total: memberList.value.length,
+const pagination = reactive({
+  current: 1,
   pageSize: 10,
-  showTotal: (total) => `共 ${total} 条记录`
-}
+  total: 0,
+  showTotal: (total) => `共 ${total} 条记录`,
+  showSizeChanger: true,
+  pageSizeOptions: ['10', '20', '50', '100']
+})
 
 // 当前选中的会员
 const currentMember = ref({})
@@ -391,23 +389,25 @@ const isEdit = ref(false)
 
 // 表单数据
 const formData = ref({
-  name: '',
-  phone: '',
-  level: 'bronze',
+  username: '',
+  phoneNumber: '',
+  memberLevel: 'bronze',
   birthday: null,
   email: '',
-  address: '',
-  remark: ''
+  gender: ''
 })
+
+// 积分记录和订单记录
+const pointsRecords = ref([])
+const orderRecords = ref([])
 
 // 表单验证规则
 const rules = {
-  name: [{ required: true, message: '请输入会员姓名' }],
-  phone: [
+  username: [{ required: true, message: '请输入会员姓名' }],
+  phoneNumber: [
     { required: true, message: '请输入手机号码' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码' }
   ],
-  level: [{ required: true, message: '请选择会员等级' }],
   email: [{ type: 'email', message: '请输入正确的邮箱地址' }]
 }
 
@@ -425,7 +425,7 @@ const getMemberLevelColor = (level) => {
 // 获取会员等级文本
 const getMemberLevelText = (level) => {
   const levelConfig = memberLevels.find(item => item.value === level)
-  return levelConfig ? levelConfig.label : ''
+  return levelConfig ? levelConfig.label : level
 }
 
 // 获取订单状态颜色
@@ -436,7 +436,7 @@ const getOrderStatusColor = (status) => {
     completed: 'success',
     cancelled: 'default'
   }
-  return colors[status]
+  return colors[status] || 'default'
 }
 
 // 获取订单状态文本
@@ -447,79 +447,204 @@ const getOrderStatusText = (status) => {
     completed: '已完成',
     cancelled: '已取消'
   }
-  return texts[status]
+  return texts[status] || status
+}
+
+// 获取会员列表
+const fetchMembers = async () => {
+  loading.value = true
+  try {
+    // 构建查询参数
+    const params = {
+      page: pagination.current - 1,
+      size: pagination.pageSize
+    }
+    
+    // 添加关键字搜索参数
+    if (searchForm.value.keyword) {
+      params.keyword = searchForm.value.keyword
+    }
+    
+    // 添加状态筛选参数
+    if (searchForm.value.status) {
+      params.status = searchForm.value.status
+    }
+    
+    // 添加门店筛选参数
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    const response = await axios.get('/member', { params })
+    
+    if (response.code === 200) {
+      const { data } = response
+      memberList.value = data.content
+      pagination.total = data.totalElements
+    }
+  } catch (error) {
+    console.error('获取会员列表失败:', error)
+    message.error('获取会员列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 处理表格变化
+const handleTableChange = (pag) => {
+  pagination.current = pag.current
+  pagination.pageSize = pag.pageSize
+  fetchMembers()
 }
 
 // 处理函数
 const handleSearch = () => {
-  message.success('搜索成功')
+  pagination.current = 1
+  fetchMembers()
 }
 
 const handleReset = () => {
   searchForm.value = {
     keyword: '',
     level: undefined,
-    status: undefined
+    status: undefined,
+    storeId: undefined
   }
-  handleSearch()
+  pagination.current = 1
+  fetchMembers()
 }
 
 const handleAdd = () => {
   isEdit.value = false
   formData.value = {
-    name: '',
-    phone: '',
-    level: 'bronze',
+    username: '',
+    phoneNumber: '',
+    memberLevel: 'bronze',
     birthday: null,
     email: '',
-    address: '',
-    remark: ''
+    gender: ''
   }
   modalVisible.value = true
 }
 
 const handleEdit = (record) => {
   isEdit.value = true
-  formData.value = { ...record }
+  formData.value = {
+    username: record.member.name,
+    phoneNumber: record.member.phoneNumber || '',
+    memberLevel: record.member.memberLevel || 'bronze',
+    birthday: record.member.birthday ? dayjs(record.member.birthday) : null,
+    email: record.member.email || '',
+    gender: record.member.gender || ''
+  }
   modalVisible.value = true
 }
 
-const handleModalSubmit = () => {
-  formRef.value.validate().then(() => {
+const handleModalSubmit = async () => {
+  try {
+    await formRef.value.validate()
     submitLoading.value = true
-    setTimeout(() => {
-      message.success('保存成功')
+    
+    const newMember = {
+      username: formData.value.username,
+      name: formData.value.name || formData.value.username,
+      phoneNumber: formData.value.phoneNumber,
+      email: formData.value.email,
+      gender: formData.value.gender,
+      birthday: formData.value.birthday ? formData.value.birthday.format('YYYY-MM-DD') : null,
+    }
+    
+    const response = await axios.post('/member', newMember)
+    
+    if (response.code === 201) {
+      message.success('会员添加成功')
       modalVisible.value = false
-      submitLoading.value = false
-      handleSearch()
-    }, 1000)
-  })
+      fetchMembers()
+      resetForm()
+    }
+  } catch (error) {
+    console.error('添加会员失败:', error)
+    message.error(error.response?.data?.message || '添加会员失败')
+  } finally {
+    submitLoading.value = false
+  }
 }
 
-const handleStatusChange = (record) => {
-  const newStatus = record.status === 'active' ? 'inactive' : 'active'
-  const action = newStatus === 'active' ? '启用' : '停用'
-  record.status = newStatus
-  message.success(`${action}成功`)
+const handleStatusChange = async (record) => {
+  const newStatus = record.member.status === '正常' ? '已停用' : '正常'
+  const action = newStatus === '正常' ? '启用' : '停用'
+  
+  try {
+    const response = await axios.put(`/member/${record.member.memberId}/status?status=${newStatus}`)
+    
+    if (response.code === 200) {
+      message.success(`${action}成功`)
+      fetchMembers() // 重新获取列表
+    }
+  } catch (error) {
+    console.error(`${action}会员失败:`, error)
+    message.error(`${action}会员失败`)
+  }
 }
 
 const handleViewPoints = (record) => {
-  currentMember.value = {
-    ...record,
-    totalPoints: 2000,
-    usedPoints: 1000
-  }
+  currentMember.value = record
+  
+  // 模拟积分记录数据，实际应该从API获取
+  pointsRecords.value = [
+    {
+      id: 1,
+      time: '2024-03-20 14:30:00',
+      type: 'earn',
+      points: '+100',
+      source: '购物奖励',
+      remark: '订单号: 202403200001'
+    },
+    {
+      id: 2,
+      time: '2024-03-15 10:20:00',
+      type: 'use',
+      points: '-50',
+      source: '积分兑换',
+      remark: '兑换商品: 洗发水'
+    }
+  ]
+  
   pointsVisible.value = true
 }
 
 const handleViewOrders = (record) => {
-  currentMember.value = {
-    ...record,
-    orderCount: 10,
-    lastOrderTime: '2024-03-15 14:30:00'
-  }
+  currentMember.value = record
+  
+  // 模拟订单记录数据，实际应该从API获取
+  orderRecords.value = [
+    {
+      id: 1,
+      orderNo: '202403200001',
+      orderTime: '2024-03-20 14:30:00',
+      amount: 299.00,
+      paymentMethod: '微信支付',
+      status: 'completed',
+      storeName: '总店'
+    },
+    {
+      id: 2,
+      orderNo: '202403150002',
+      orderTime: '2024-03-15 10:20:00',
+      amount: 158.50,
+      paymentMethod: '支付宝',
+      status: 'completed',
+      storeName: '分店一'
+    }
+  ]
+  
   ordersVisible.value = true
 }
+
+// 组件挂载时获取会员列表
+onMounted(() => {
+  fetchMembers()
+})
 </script>
 
 <style lang="less" scoped>

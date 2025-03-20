@@ -76,7 +76,7 @@ const router = createRouter({
           name: 'userAddress',
           component: () => import('../views/user/address.vue'),
           meta: {
-            title: '收货地址',
+            title: '收货地址管理',
           },
         },
         {
@@ -120,7 +120,7 @@ const router = createRouter({
           },
         },
         {
-          path: 'store',
+          path: 'storeManagement',
           name: 'store',
           component: () => import('../views/store/list.vue'),
           meta: {
@@ -134,6 +134,16 @@ const router = createRouter({
           meta: {
             title: '会员管理',
           },
+        },
+        {
+          path: 'employeeManagement',
+          name: 'employeeManagement',
+          component: () => import('../views/employee/list.vue'),
+          meta: {
+            title: '员工管理',
+            requiresAuth: true,
+            roles: ['admin']
+          }
         },
         {
           path: 'order',
@@ -166,11 +176,11 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('token')
+  const token = localStorage.getItem('access_token')
   document.title = to.meta.title ? `${to.meta.title} - 药品管理系统` : '药品管理系统'
 
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next({ name: 'login', query: { redirect: to.fullPath } })
+  if (to.path.startsWith('/home') && !token) {
+    next('/login')
   } else {
     next()
   }

@@ -93,7 +93,8 @@
             name="password"
             :rules="[
               { required: true, message: '请输入密码!' },
-              { min: 6, message: '密码至少6个字符!' },
+              { min: 8, message: '密码至少8个字符!' },
+              { validator: validatePasswordComplexity }
             ]"
           >
             <a-input-password
@@ -141,17 +142,22 @@
         <div class="toggle-container">
           <a @click="toggleForm">{{ isLogin ? '没有账号？立即注册' : '已有账号？立即登录' }}</a>
         </div>
+
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, nextTick, onMounted } from 'vue'
 import { UserOutlined, LockOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import axios from '@/utils/axios'
+import { useRouter, useRoute } from 'vue-router'
 import 'animate.css'
 
+const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const isLogin = ref(true)
 
@@ -172,15 +178,40 @@ const validateConfirmPassword = async (rule, value) => {
   }
 }
 
+const validatePasswordComplexity = async (rule, value) => {
+  // 检查密码长度
+  if (value.length < 8) {
+    throw new Error('密码长度至少为8个字符')
+  }
+  
+  // 检查是否包含数字
+  if (!/\d/.test(value)) {
+    throw new Error('密码必须包含至少一个数字')
+  }
+  
+}
+
 const handleLogin = async (values) => {
   try {
     loading.value = true
-    console.log('登录信息：', values)
-    // 这里添加登录逻辑
-    message.success('登录成功！')
+    const response = await axios.post('/auth/login', {
+      username: values.username,
+      password: values.password
+    })
+    console.log(response)
+
+    if (response.code === 200) {
+      // 保存 token
+      localStorage.setItem('access_token', response.data.access_token)
+      message.success('登录成功！')
+      // 跳转到首页
+      nextTick(() => {
+        router.push('/home/products')
+      })
+    }
   } catch (error) {
     console.error('登录失败：', error)
-    message.error('登录失败，请重试！')
+    message.error(error.response?.data?.message || '登录失败，请重试！')
   } finally {
     loading.value = false
   }
@@ -188,22 +219,71 @@ const handleLogin = async (values) => {
 
 const handleRegister = async (values) => {
   try {
+    // 先验证两次密码是否一致
+    if (values.password !== registerForm.confirmPassword) {
+      message.error('两次输入的密码不一致！')
+      return
+    }
+
     loading.value = true
-    console.log('注册信息：', values)
-    // 这里添加注册逻辑
-    message.success('注册成功！')
-    isLogin.value = true
+    const response = await axios.post('/auth/register', {
+      username: values.username,
+      password: values.password
+    })
+
+    if (response.code === 200) {
+      message.success('注册成功！')
+      
+      // 使用 nextTick 确保状态更新完成
+      await nextTick(() => {
+        // 清空注册表单
+        registerForm.username = ''
+        registerForm.password = ''
+        registerForm.confirmPassword = ''
+        
+        // 自动填充登录表单
+        loginForm.username = values.username
+        
+        // 最后切换到登录界面
+        isLogin.value = true
+      })
+    }
   } catch (error) {
     console.error('注册失败：', error)
-    message.error('注册失败，请重试！')
+    if (error.response?.data?.message) {
+      message.error(error.response.data.message)
+    } else {
+      message.error('注册失败，请重试！')
+    }
   } finally {
     loading.value = false
   }
 }
 
 const toggleForm = () => {
+  // 清空登录表单
+  if (!isLogin.value) {
+    loginForm.username = ''
+    loginForm.password = ''
+  }
+  
+  // 清空注册表单
+  if (isLogin.value) {
+    registerForm.username = ''
+    registerForm.password = ''
+    registerForm.confirmPassword = ''
+  }
+  
+  // 切换表单状态
   isLogin.value = !isLogin.value
 }
+
+onMounted(() => {
+  // 检查是否是从密码修改页面跳转过来的
+  if (route.query.passwordChanged === 'true') {
+    message.success('密码已修改，请使用新密码登录')
+  }
+})
 </script>
 
 <style lang="less" scoped>
@@ -273,6 +353,33 @@ const toggleForm = () => {
 
           &:hover {
             color: #40a9ff;
+          }
+        }
+      }
+
+      .password-rules {
+        margin-top: 16px;
+        padding: 12px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #666;
+
+        .rules-title {
+          margin-bottom: 8px;
+          font-weight: 500;
+        }
+
+        ul {
+          margin: 0;
+          padding-left: 20px;
+
+          li {
+            margin-bottom: 4px;
+            
+            &:last-child {
+              margin-bottom: 0;
+            }
           }
         }
       }

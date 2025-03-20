@@ -41,6 +41,8 @@
         :pagination="pagination"
         :row-key="record => record.id"
         bordered
+        :loading="loading"
+        @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <!-- 状态列 -->
@@ -89,24 +91,12 @@
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 16 }"
       >
-        <a-form-item label="分店编号" name="code" required>
-          <a-input 
-            v-model:value="formData.code" 
-            placeholder="请输入分店编号"
-            :disabled="isEdit"
-          />
-        </a-form-item>
-
         <a-form-item label="分店名称" name="name" required>
           <a-input v-model:value="formData.name" placeholder="请输入分店名称" />
         </a-form-item>
 
-        <a-form-item label="负责人" name="manager" required>
-          <a-input v-model:value="formData.manager" placeholder="请输入负责人姓名" />
-        </a-form-item>
-
-        <a-form-item label="联系电话" name="phone" required>
-          <a-input v-model:value="formData.phone" placeholder="请输入联系电话" />
+        <a-form-item label="联系电话" name="phoneNumber" required>
+          <a-input v-model:value="formData.phoneNumber" placeholder="请输入联系电话" />
         </a-form-item>
 
         <a-form-item label="营业时间" required>
@@ -138,14 +128,6 @@
             <a-radio value="active">营业中</a-radio>
             <a-radio value="inactive">已停业</a-radio>
           </a-radio-group>
-        </a-form-item>
-
-        <a-form-item label="备注" name="remark">
-          <a-textarea
-            v-model:value="formData.remark"
-            :rows="2"
-            placeholder="请输入备注信息"
-          />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -222,16 +204,67 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
+import axios from '../../utils/axios'
 
 // 搜索表单
 const searchForm = ref({
   keyword: '',
   status: undefined
 })
+
+// 分店列表
+const storeList = ref([])
+
+// 分页配置
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total) => `共 ${total} 条记录`
+})
+
+// 加载状态
+const loading = ref(false)
+const submitLoading = ref(false)
+
+// 弹窗控制
+const modalVisible = ref(false)
+const isEdit = ref(false)
+
+// 表单引用
+const formRef = ref(null)
+
+// 表单数据
+const formData = ref({
+  id: null,
+  code: '',
+  name: '',
+  phoneNumber: '',
+  openTime: null,
+  closeTime: null,
+  address: '',
+  status: 'active'
+})
+
+// 表单验证规则
+const rules = {
+  name: [
+    { required: true, message: '请输入分店名称', trigger: 'blur' }
+  ],
+  phoneNumber: [
+    { required: true, message: '请输入联系电话', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ],
+  address: [
+    { required: true, message: '请输入分店地址', trigger: 'blur' }
+  ]
+}
 
 // 表格列定义
 const columns = [
@@ -243,38 +276,35 @@ const columns = [
   {
     title: '分店名称',
     dataIndex: 'name',
-    width: 200,
+    width: 150,
   },
   {
-    title: '负责人',
-    dataIndex: 'manager',
-    width: 120,
+    title: '详细地址',
+    dataIndex: 'address',
+    width: 250,
   },
   {
     title: '联系电话',
-    dataIndex: 'phone',
-    width: 140,
+    dataIndex: 'phoneNumber',
+    width: 150,
   },
   {
     title: '营业时间',
-    dataIndex: 'businessHours',
-    width: 200,
-  },
-  {
-    title: '地址',
-    dataIndex: 'address',
-    ellipsis: true,
+    customRender: ({ record }) => {
+      return `${record.openTime} - ${record.closeTime}`
+    },
+    width: 180,
   },
   {
     title: '状态',
+    dataIndex: 'status',
     key: 'status',
     width: 100,
   },
   {
     title: '操作',
     key: 'action',
-    width: 400,
-    fixed: 'right'
+    width: 350,
   }
 ]
 
@@ -355,49 +385,6 @@ const orderColumns = [
   }
 ]
 
-// 模拟数据
-const storeList = ref([
-  {
-    id: 1,
-    code: 'S001',
-    name: '总店',
-    manager: '张三',
-    phone: '13800138000',
-    openTime: '09:00:00',
-    closeTime: '21:00:00',
-    businessHours: '09:00-21:00',
-    address: '广州市天河区天河路123号',
-    status: 'active',
-    remark: ''
-  },
-  {
-    id: 2,
-    code: 'S002',
-    name: '分店1',
-    manager: '李四',
-    phone: '13900139000',
-    openTime: '09:00:00',
-    closeTime: '21:00:00',
-    businessHours: '09:00-21:00',
-    address: '广州市海珠区江南大道456号',
-    status: 'active',
-    remark: ''
-  }
-])
-
-// 分页配置
-const pagination = {
-  total: storeList.value.length,
-  pageSize: 10,
-  showTotal: (total) => `共 ${total} 条记录`,
-}
-
-// 弹窗相关
-const modalVisible = ref(false)
-const submitLoading = ref(false)
-const formRef = ref()
-const isEdit = ref(false)
-
 // 记录弹窗
 const purchaseVisible = ref(false)
 const inventoryVisible = ref(false)
@@ -407,34 +394,6 @@ const orderVisible = ref(false)
 const purchaseRecords = ref([])
 const inventoryRecords = ref([])
 const orderRecords = ref([])
-
-// 表单数据
-const formData = ref({
-  code: '',
-  name: '',
-  manager: '',
-  phone: '',
-  openTime: null,
-  closeTime: null,
-  address: '',
-  status: 'active',
-  remark: ''
-})
-
-// 表单验证规则
-const rules = {
-  code: [{ required: true, message: '请输入分店编号' }],
-  name: [{ required: true, message: '请输入分店名称' }],
-  manager: [{ required: true, message: '请输入负责人' }],
-  phone: [
-    { required: true, message: '请输入联系电话' },
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号' }
-  ],
-  openTime: [{ required: true, message: '请选择营业开始时间' }],
-  closeTime: [{ required: true, message: '请选择营业结束时间' }],
-  address: [{ required: true, message: '请输入详细地址' }],
-  status: [{ required: true, message: '请选择营业状态' }]
-}
 
 // 状态颜色和文本
 const getPurchaseStatusColor = (status) => {
@@ -487,62 +446,151 @@ const getOrderStatusText = (status) => {
   return texts[status]
 }
 
-// 处理函数
-const handleSearch = () => {
-  message.success('搜索成功')
+// 获取分店列表
+const fetchStores = async () => {
+  try {
+    loading.value = true
+    
+    const params = {
+      page: pagination.current - 1,
+      size: pagination.pageSize
+    }
+    
+    if (searchForm.value.keyword) {
+      params.keyword = searchForm.value.keyword
+    }
+    
+    if (searchForm.value.status) {
+      params.status = searchForm.value.status
+    }
+    
+    const response = await axios.get('/store', { params })
+    
+    if (response.data) {
+      storeList.value = response.data.content
+      pagination.total = response.data.totalElements
+    }
+  } catch (error) {
+    console.error('获取分店列表失败:', error)
+    message.error('获取分店列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
+// 处理表格变化
+const handleTableChange = (pag) => {
+  pagination.current = pag.current
+  pagination.pageSize = pag.pageSize
+  fetchStores()
+}
+
+// 处理搜索
+const handleSearch = () => {
+  pagination.current = 1
+  fetchStores()
+}
+
+// 处理重置
 const handleReset = () => {
   searchForm.value = {
     keyword: '',
     status: undefined
   }
-  handleSearch()
+  pagination.current = 1
+  fetchStores()
 }
 
+// 处理添加
 const handleAdd = () => {
   isEdit.value = false
   formData.value = {
+    id: null,
     code: '',
     name: '',
-    manager: '',
-    phone: '',
+    phoneNumber: '',
     openTime: null,
     closeTime: null,
     address: '',
-    status: 'active',
-    remark: ''
+    status: 'active'
   }
   modalVisible.value = true
 }
 
+// 处理编辑
 const handleEdit = (record) => {
   isEdit.value = true
+  
+  // 深拷贝记录数据，避免直接修改原始数据
   formData.value = {
-    ...record,
-    openTime: dayjs(record.openTime, 'HH:mm:ss'),
-    closeTime: dayjs(record.closeTime, 'HH:mm:ss')
+    id: record.id,
+    code: record.code,
+    name: record.name,
+    phoneNumber: record.phoneNumber,
+    // 如果有时间数据，转换为dayjs对象
+    openTime: record.openTime ? dayjs(record.openTime, 'HH:mm:ss') : null,
+    closeTime: record.closeTime ? dayjs(record.closeTime, 'HH:mm:ss') : null,
+    address: record.address,
+    status: record.status
   }
+  
   modalVisible.value = true
 }
 
-const handleModalSubmit = () => {
-  formRef.value.validate().then(() => {
-    submitLoading.value = true
-    setTimeout(() => {
-      message.success('保存成功')
-      modalVisible.value = false
-      submitLoading.value = false
-      handleSearch()
-    }, 1000)
-  })
+// 处理状态变更
+const handleStatusChange = async (record) => {
+  try {
+    const newStatus = record.status === 'active' ? 'inactive' : 'active'
+    const action = newStatus === 'active' ? '营业' : '停业'
+    
+    await axios.put(`/store/${record.id}/status`, null, {
+      params: { status: newStatus }
+    })
+    
+    message.success(`${action}成功`)
+    fetchStores()
+  } catch (error) {
+    console.error('更新分店状态失败:', error)
+    message.error('更新分店状态失败')
+  }
 }
 
-const handleStatusChange = (record) => {
-  const newStatus = record.status === 'active' ? 'inactive' : 'active'
-  const action = newStatus === 'active' ? '营业' : '停业'
-  record.status = newStatus
-  message.success(`${action}成功`)
+// 禁用日期选择
+const disabledDate = (current) => {
+  return current && current > dayjs().endOf('day')
+}
+
+// 处理表单提交
+const handleModalSubmit = async () => {
+  try {
+    await formRef.value.validate()
+    submitLoading.value = true
+    
+    const requestData = {
+      name: formData.value.name,
+      phoneNumber: formData.value.phoneNumber,
+      openTime: formData.value.openTime ? formData.value.openTime.format('HH:mm:ss') : null,
+      closeTime: formData.value.closeTime ? formData.value.closeTime.format('HH:mm:ss') : null,
+      address: formData.value.address,
+      status: formData.value.status
+    }
+    
+    if (isEdit.value) {
+      await axios.put(`/store/${formData.value.id}`, requestData)
+      message.success('分店信息更新成功')
+    } else {
+      await axios.post('/store', requestData)
+      message.success('分店添加成功')
+    }
+    
+    modalVisible.value = false
+    fetchStores()
+  } catch (error) {
+    console.error('保存分店信息失败:', error)
+    message.error(error.response?.data?.message || '保存分店信息失败')
+  } finally {
+    submitLoading.value = false
+  }
 }
 
 // 查看记录
@@ -607,6 +655,11 @@ const handleViewOrder = (record) => {
   ]
   orderVisible.value = true
 }
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchStores()
+})
 </script>
 
 <style lang="less" scoped>
