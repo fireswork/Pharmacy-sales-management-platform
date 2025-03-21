@@ -198,7 +198,6 @@ const handleLogin = async (values) => {
       username: values.username,
       password: values.password
     })
-    console.log(response)
 
     if (response.code === 200) {
       // 保存 token
@@ -206,7 +205,7 @@ const handleLogin = async (values) => {
       message.success('登录成功！')
       // 跳转到首页
       nextTick(() => {
-        router.push('/home/products')
+        router.push('/home')
       })
     }
   } catch (error) {

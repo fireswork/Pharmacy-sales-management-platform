@@ -17,6 +17,7 @@
             style="width: 200px"
             placeholder="请选择门店"
             @change="handleStoreChange"
+            v-if="userInfo?.role?.toUpperCase() === 'USER'"
           >
             <a-select-option v-for="store in stores" :key="store.id" :value="store.id">
               {{ store?.name }}
@@ -161,7 +162,7 @@ const selectedKeys = ref(['products'])
 const openKeys = ref(['user'])
 
 // 添加 loading 状态
-const loading = ref(true)
+const loading = ref(false)
 
 // 用户信息相关
 const userInfo = ref(null)
@@ -171,6 +172,10 @@ const getUserInfo = async () => {
   const response = await axios.get('/user')
   if (response.code === 200) {
     userInfo.value = response.data
+  }
+  if (response.data.role.toUpperCase() === 'USER') {
+    loading.value = true
+    fetchStores()
   }
 }
 
@@ -244,7 +249,6 @@ const handleLogout = () => {
 // 在组件挂载时获取用户信息和门店列表
 onMounted(() => {
   getUserInfo()
-  fetchStores()
 })
 </script>
 

@@ -60,7 +60,7 @@ public class InventoryController {
                 .filter(inv -> {
                     Product product = inv.getProduct();
                     return product.getCategory() != null && 
-                           product.getCategory().getId().equals(categoryId);
+                           categoryId.toString().equals(product.getCategory());
                 })
                 .collect(Collectors.toList());
         }
