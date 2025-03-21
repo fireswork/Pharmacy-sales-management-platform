@@ -9,9 +9,10 @@ public class Employee {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String code; // 员工编号，自动生成
     
-    @Column(unique = true, nullable = false)
-    private String employeeId;
     
     @Column(nullable = false)
     private String name;
@@ -43,12 +44,12 @@ public class Employee {
         this.id = id;
     }
 
-    public String getEmployeeId() {
-        return employeeId;
+    public String getCode() {
+        return code;
     }
 
-    public void setEmployeeId(String employeeId) {
-        this.employeeId = employeeId;
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getName() {
@@ -106,4 +107,4 @@ public class Employee {
     public void setHireDate(Date hireDate) {
         this.hireDate = hireDate;
     }
-} 
+}

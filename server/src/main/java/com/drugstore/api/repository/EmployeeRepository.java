@@ -10,28 +10,28 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
-    Employee findByEmployeeId(String employeeId);
+    Employee findById(String id);
     
     Employee findByUser(User user);
     
     Page<Employee> findAll(Pageable pageable);
     
-    Page<Employee> findByNameContainingOrPhoneNumberContaining(String name, String phoneNumber, Pageable pageable);
+    Page<Employee> findByNameContainingOrPhoneNumberContaining(String name, String phone, Pageable pageable);
     
     Page<Employee> findByStatus(String status, Pageable pageable);
     
     Page<Employee> findByStatusAndNameContainingOrPhoneNumberContaining(
-        String status, String name, String phoneNumber, Pageable pageable);
+        String status, String name, String phone, Pageable pageable);
     
     Page<Employee> findByStoreId(Long storeId, Pageable pageable);
     
     Page<Employee> findByStoreIdAndStatus(Long storeId, String status, Pageable pageable);
     
     Page<Employee> findByStoreIdAndNameContainingOrPhoneNumberContaining(
-        Long storeId, String name, String phoneNumber, Pageable pageable);
+        Long storeId, String name, String phone, Pageable pageable);
     
     Page<Employee> findByStoreIdAndStatusAndNameContainingOrPhoneNumberContaining(
-        Long storeId, String status, String name, String phoneNumber, Pageable pageable);
+        Long storeId, String status, String name, String phone, Pageable pageable);
     
     @Query("SELECT COUNT(e) FROM Employee e")
     long countEmployees();

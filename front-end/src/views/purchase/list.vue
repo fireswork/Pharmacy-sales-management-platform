@@ -20,9 +20,10 @@
             <a-select-option value="approved">已通过</a-select-option>
             <a-select-option value="rejected">已拒绝</a-select-option>
           </a-select>
-          <a-range-picker
-            v-model:value="searchForm.dateRange"
-            style="width: 240px"
+          <a-date-picker
+            v-model:value="searchForm.date"
+            style="width: 200px"
+            placeholder="申请日期"
           />
           <a-button type="primary" @click="handleSearch">
             <template #icon><SearchOutlined /></template>
@@ -44,8 +45,9 @@
         :columns="columns"
         :data-source="purchaseList"
         :pagination="pagination"
-        :row-key="record => record.id"
+        :row-key="(record) => record.id"
         bordered
+        :loading="loading"
       >
         <template #bodyCell="{ column, record }">
           <!-- 状态列 -->
@@ -61,7 +63,9 @@
               <a-button type="link" size="small" @click="handleView(record)">查看</a-button>
               <template v-if="isAdmin && record.status === 'pending'">
                 <a-button type="link" size="small" @click="handleApprove(record)">通过</a-button>
-                <a-button type="link" size="small" danger @click="handleReject(record)">拒绝</a-button>
+                <a-button type="link" size="small" danger @click="handleReject(record)"
+                  >拒绝</a-button
+                >
               </template>
             </a-space>
           </template>
@@ -88,11 +92,7 @@
         :wrapper-col="{ span: 16 }"
       >
         <a-form-item label="采购名称" name="name" required>
-          <a-input 
-            v-model:value="formData.name" 
-            placeholder="请输入采购名称"
-            :disabled="isView" 
-          />
+          <a-input v-model:value="formData.name" placeholder="请输入采购名称" :disabled="isView" />
         </a-form-item>
 
         <a-form-item label="供应商" name="supplierId" required>
@@ -103,8 +103,12 @@
             show-search
             :filter-option="filterOption"
           >
-            <a-select-option v-for="item in supplierOptions" :key="item.id" :value="item.id">
-              {{ item.name }}
+            <a-select-option
+              v-for="supplier in supplierOptions"
+              :key="supplier.id"
+              :value="supplier.id"
+            >
+              {{ supplier.name }}
             </a-select-option>
           </a-select>
         </a-form-item>
@@ -183,8 +187,12 @@
             show-search
             :filter-option="filterOption"
           >
-            <a-select-option v-for="item in filteredProductOptions" :key="item.id" :value="item.id">
-              {{ item.name }}
+            <a-select-option
+              v-for="product in productOptions"
+              :key="product.id"
+              :value="product.id"
+            >
+              {{ product.name }}
             </a-select-option>
           </a-select>
         </a-form-item>
@@ -207,18 +215,19 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { message } from 'ant-design-vue'
+import { ref, computed, onMounted, h } from 'vue'
+import { message, Modal, Input } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import request from '@/utils/axios'
 
 // 是否是管理员
 const isAdmin = ref(true) // 这里应该根据实际登录用户角色判断
 
 // 搜索表单
 const searchForm = ref({
-  keyword: '',
+  // keyword: '',
   status: undefined,
-  dateRange: []
+  date: null
 })
 
 // 表格列定义
@@ -226,32 +235,32 @@ const columns = [
   {
     title: '采购编号',
     dataIndex: 'code',
-    width: 120,
+    width: 120
   },
   {
     title: '采购名称',
     dataIndex: 'name',
-    width: 200,
+    width: 200
   },
   {
     title: '供应商',
     dataIndex: 'supplierName',
-    width: 200,
+    width: 200
   },
   {
     title: '申请人',
     dataIndex: 'applicant',
-    width: 120,
+    width: 120
   },
   {
     title: '申请时间',
     dataIndex: 'createTime',
-    width: 180,
+    width: 180
   },
   {
     title: '状态',
     key: 'status',
-    width: 100,
+    width: 100
   },
   {
     title: '操作',
@@ -266,21 +275,21 @@ const productColumns = [
   {
     title: '药品名称',
     dataIndex: 'name',
-    width: 200,
+    width: 200
   },
   {
     title: '采购数量',
     dataIndex: 'quantity',
-    width: 120,
+    width: 120
   },
   {
     title: '备注',
-    dataIndex: 'remark',
+    dataIndex: 'remark'
   },
   {
     title: '操作',
     key: 'action',
-    width: 80,
+    width: 80
   }
 ]
 
@@ -303,33 +312,96 @@ const getStatusText = (status) => {
   return map[status]
 }
 
-// 模拟数据
-const purchaseList = ref([
-  {
-    id: 1,
-    code: 'PO001',
-    name: '常用药品采购',
-    supplierName: '广州医药有限公司',
-    applicant: '张三',
-    createTime: '2024-03-20 10:00:00',
-    status: 'pending'
-  },
-  {
-    id: 2,
-    code: 'PO002',
-    name: '季度药品补货',
-    supplierName: '深圳医药集团',
-    applicant: '李四',
-    createTime: '2024-03-19 14:30:00',
-    status: 'approved'
-  }
-])
+// 列表数据
+const purchaseList = ref([])
+const loading = ref(false)
+
+// 供应商和药品选项
+const supplierOptions = ref([])
+const productOptions = ref([])
+
+// 拒绝原因
+const rejectReason = ref('')
 
 // 分页配置
-const pagination = {
-  total: purchaseList.value.length,
+const pagination = ref({
+  current: 1,
   pageSize: 10,
+  total: 0,
   showTotal: (total) => `共 ${total} 条记录`,
+  onChange: (page, pageSize) => {
+    pagination.value.current = page
+    pagination.value.pageSize = pageSize
+    fetchPurchaseList()
+  }
+})
+
+// API 请求方法
+const getSupplierList = () => {
+  return request({
+    url: '/suppliers',
+    method: 'get'
+  })
+}
+
+const getProductList = () => {
+  return request({
+    url: '/products',
+    method: 'get'
+  })
+}
+
+const getPurchaseList = (params) => {
+  return request({
+    url: '/purchases',
+    method: 'get',
+    params
+  })
+}
+
+const createPurchase = (data) => {
+  return request({
+    url: '/purchases',
+    method: 'post',
+    data
+  })
+}
+
+const approvePurchase = (id, comment) => {
+  return request({
+    url: `/purchases/${id}/approve`,
+    method: 'patch',
+    params: { comment }
+  })
+}
+
+const rejectPurchase = (id, comment) => {
+  return request({
+    url: `/purchases/${id}/reject`,
+    method: 'patch',
+    params: { comment }
+  })
+}
+
+// 获取采购列表
+const fetchPurchaseList = async () => {
+  loading.value = true
+  try {
+    const params = {
+      keyword: searchForm.value.keyword,
+      status: searchForm.value.status,
+      date: searchForm.value.date ? searchForm.value.date.format('YYYY-MM-DD') : undefined,
+      page: pagination.value.current - 1, // 后端页码从 0 开始
+      size: pagination.value.pageSize // 使用 size 而不是 pageSize
+    }
+    const res = await getPurchaseList(params)
+    purchaseList.value = res.data.content
+    pagination.value.total = res.data.totalElements // 使用 totalElements 而不是 total
+  } catch (error) {
+    message.error('获取采购列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 弹窗相关
@@ -337,7 +409,7 @@ const modalVisible = ref(false)
 const submitLoading = ref(false)
 const formRef = ref()
 const isView = ref(false)
-const modalTitle = computed(() => isView.value ? '查看采购' : '新增采购')
+const modalTitle = computed(() => (isView.value ? '查看采购' : '新增采购'))
 
 // 表单数据
 const formData = ref({
@@ -372,33 +444,9 @@ const productRules = {
   quantity: [{ required: true, message: '请输入采购数量' }]
 }
 
-// 模拟药品数据
-const productOptions = [
-  { id: 1, name: '布洛芬缓释胶囊' },
-  { id: 2, name: '感冒灵颗粒' },
-  { id: 3, name: '板蓝根颗粒' }
-]
-
-// 模拟供应商数据
-const supplierOptions = [
-  { id: 1, name: '广州医药有限公司' },
-  { id: 2, name: '深圳医药集团' },
-  { id: 3, name: '上海医药股份有限公司' }
-]
-
-// 模拟供应商药品关联数据
-const supplierProducts = [
-  { supplierId: 1, productIds: [1, 2] },
-  { supplierId: 2, productIds: [2, 3] },
-  { supplierId: 3, productIds: [1, 3] }
-]
-
-// 根据选择的供应商筛选可选药品
+// 修改计算属性
 const filteredProductOptions = computed(() => {
-  if (!formData.value.supplierId) return []
-  const supplierProduct = supplierProducts.find(item => item.supplierId === formData.value.supplierId)
-  if (!supplierProduct) return []
-  return productOptions.filter(product => supplierProduct.productIds.includes(product.id))
+  return productOptions.value
 })
 
 // 搜索药品
@@ -408,14 +456,15 @@ const filterOption = (input, option) => {
 
 // 处理函数
 const handleSearch = () => {
-  message.success('搜索成功')
+  pagination.value.current = 1
+  fetchPurchaseList()
 }
 
 const handleReset = () => {
   searchForm.value = {
-    keyword: '',
+    // keyword: '',
     status: undefined,
-    dateRange: []
+    date: null
   }
   handleSearch()
 }
@@ -440,22 +489,30 @@ const handleView = (record) => {
 }
 
 const handleModalSubmit = () => {
-  formRef.value.validate().then(() => {
+  formRef.value.validate().then(async () => {
     submitLoading.value = true
-    setTimeout(() => {
+    try {
+      // 构建符合后端期望的数据格式
+      const submitData = {
+        name: formData.value.name,
+        supplierId: formData.value.supplierId,
+        reason: formData.value.reason,
+        products: formData.value.products
+      }
+
+      await createPurchase(submitData)
       message.success('提交成功')
       modalVisible.value = false
+      fetchPurchaseList()
+    } catch (error) {
+      message.error('提交失败: ' + (error.response?.data?.message || error.message))
+    } finally {
       submitLoading.value = false
-      handleSearch()
-    }, 1000)
+    }
   })
 }
 
 const handleAddProduct = () => {
-  if (!formData.value.supplierId) {
-    message.warning('请先选择供应商')
-    return
-  }
   productForm.value = {
     productId: undefined,
     quantity: 1,
@@ -465,42 +522,126 @@ const handleAddProduct = () => {
 }
 
 const handleRemoveProduct = (record) => {
-  formData.value.products = formData.value.products.filter(item => item.id !== record.id)
+  formData.value.products = formData.value.products.filter((item) => item.id !== record.id)
 }
 
 const handleProductSelect = (value) => {
-  const selected = productOptions.find(item => item.id === value)
-  productForm.value.name = selected.name
+  const selected = productOptions.value.find((item) => item.id === value)
+  if (selected) {
+    productForm.value = {
+      ...productForm.value,
+      productId: selected.id,
+      name: selected.name
+    }
+  }
 }
 
 const handleProductModalSubmit = () => {
   productFormRef.value.validate().then(() => {
     productSubmitLoading.value = true
-    setTimeout(() => {
-      const selectedProduct = productOptions.find(item => item.id === productForm.value.productId)
+    const selectedProduct = productOptions.value.find(
+      (item) => item.id === productForm.value.productId
+    )
+
+    if (selectedProduct) {
       const product = {
-        id: Date.now(),
+        productId: productForm.value.productId,
         name: selectedProduct.name,
         quantity: productForm.value.quantity,
         remark: productForm.value.remark
       }
+
       formData.value.products.push(product)
       productModalVisible.value = false
-      productSubmitLoading.value = false
-    }, 500)
+      message.success('添加药品成功')
+    }
+    productSubmitLoading.value = false
   })
 }
 
 // 审核相关
-const handleApprove = (record) => {
-  record.status = 'approved'
-  message.success('审核通过')
+const handleApprove = async (record) => {
+  try {
+    await request.put(`/purchases/${record.id}`, {
+      status: 'approved',
+      comment: ''
+    });
+    message.success('已通过');
+    fetchPurchaseList();
+  } catch (error) {
+    message.error('操作失败');
+  }
+};
+
+const handleReject = async (record) => {
+  try {
+    const comment = await new Promise((resolve) => {
+      Modal.confirm({
+        title: '拒绝采购申请',
+        content: h(
+          'div',
+          {},
+          [
+            h('p', '请输入拒绝原因：'),
+            h(Input.TextArea, {
+              rows: 4,
+              onChange: (e) => {
+                rejectReason.value = e.target.value;
+              },
+            }),
+          ]
+        ),
+        onOk: () => {
+          resolve(rejectReason.value);
+        },
+        onCancel: () => {
+          resolve(null);
+        },
+        okText: '确定',
+        cancelText: '取消',
+        width: 480,
+      });
+    });
+
+    if (comment) {
+      await request.put(`/purchases/${record.id}`, {
+        status: 'rejected',
+        comment
+      });
+      message.success('已拒绝');
+      fetchPurchaseList();
+    }
+  } catch (error) {
+    message.error('操作失败');
+  }
+};
+
+// 获取供应商列表
+const fetchSupplierList = async () => {
+  try {
+    const res = await getSupplierList()
+    supplierOptions.value = res.data.content || []
+  } catch (error) {
+    message.error('获取供应商列表失败')
+  }
 }
 
-const handleReject = (record) => {
-  record.status = 'rejected'
-  message.success('已拒绝')
+// 获取药品列表
+const fetchProductList = async () => {
+  try {
+    const res = await getProductList()
+    productOptions.value = res.data.content || []
+  } catch (error) {
+    message.error('获取药品列表失败')
+  }
 }
+
+// 初始化数据
+onMounted(() => {
+  fetchSupplierList()
+  fetchProductList()
+  fetchPurchaseList()
+})
 </script>
 
 <style lang="less" scoped>
@@ -524,4 +665,4 @@ const handleReject = (record) => {
     margin-bottom: 24px;
   }
 }
-</style> 
+</style>

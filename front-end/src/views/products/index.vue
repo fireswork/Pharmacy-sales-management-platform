@@ -40,13 +40,21 @@
         <a-col :xs="24" :sm="12" :md="8" :lg="6" v-for="product in products" :key="product.id">
           <a-card hoverable class="product-card">
             <template #cover>
-              <img :src="product.image" :alt="product.name" />
+              <img :src="product.image || 'https://via.placeholder.com/300x200?text=No+Image'" :alt="product.name" />
             </template>
             <a-card-meta :title="product.name">
               <template #description>
                 <div class="product-info">
-                  <div class="price">¥{{ product.price }}</div>
-                  <div class="stock">库存: {{ product.stock }}</div>
+                  <div class="price">¥{{ product.price || '暂无价格' }}</div>
+                  <div class="stock">
+                    库存: 
+                    <span :class="getStockClass(product.quantity)">
+                      {{ product.quantity || 0 }}
+                    </span>
+                    <a-tag v-if="getStockStatus(product.quantity)" :color="getStockStatusColor(product.quantity)">
+                      {{ getStockStatus(product.quantity) }}
+                    </a-tag>
+                  </div>
                   <div class="description">{{ product.description }}</div>
                   <a-tag v-if="product.prescription" color="red">处方药</a-tag>
                   <a-tag v-else color="green">非处方药</a-tag>
@@ -59,7 +67,11 @@
                 <HeartFilled v-else style="color: #ff4d4f" />
                 {{ product.isFavorite ? '已收藏' : '收藏' }}
               </a-button>
-              <a-button type="primary" @click="addToCart(product)">
+              <a-button 
+                type="primary" 
+                @click="addToCart(product)"
+                :disabled="!product.quantity"
+              >
                 <ShoppingCartOutlined /> 加入购物车
               </a-button>
             </div>
@@ -87,19 +99,30 @@
     >
       <div class="product-detail" v-if="selectedProduct">
         <div class="detail-image">
-          <img :src="selectedProduct.image" :alt="selectedProduct.name" />
+          <img 
+            :src="selectedProduct.image || 'https://via.placeholder.com/300x200?text=No+Image'" 
+            :alt="selectedProduct.name" 
+          />
         </div>
         <div class="detail-info">
           <h3>基本信息</h3>
-          <p><strong>价格：</strong>¥{{ selectedProduct.price }}</p>
-          <p><strong>库存：</strong>{{ selectedProduct.stock }}</p>
+          <p><strong>价格：</strong>¥{{ selectedProduct.price || '暂无价格' }}</p>
+          <p>
+            <strong>库存：</strong>
+            <span :class="getStockClass(selectedProduct.quantity)">
+              {{ selectedProduct.quantity || 0 }}
+            </span>
+            <a-tag v-if="getStockStatus(selectedProduct.quantity)" :color="getStockStatusColor(selectedProduct.quantity)">
+              {{ getStockStatus(selectedProduct.quantity) }}
+            </a-tag>
+          </p>
           <p><strong>类型：</strong>{{ selectedProduct.prescription ? '处方药' : '非处方药' }}</p>
           <h3>适用症状</h3>
-          <p>{{ selectedProduct.symptoms }}</p>
+          <p>{{ selectedProduct.symptoms || '暂无信息' }}</p>
           <h3>使用方法</h3>
-          <p>{{ selectedProduct.usage }}</p>
+          <p>{{ selectedProduct.usage || '暂无信息' }}</p>
           <h3>注意事项</h3>
-          <p>{{ selectedProduct.precautions }}</p>
+          <p>{{ selectedProduct.precautions || '暂无信息' }}</p>
         </div>
       </div>
     </a-modal>
@@ -107,9 +130,10 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ShoppingCartOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
+import request from '@/utils/axios'
 
 // 搜索表单
 const searchForm = reactive({
@@ -129,30 +153,62 @@ const categories = [
 const pagination = reactive({
   current: 1,
   pageSize: 12,
-  total: 100
+  total: 0
 })
 
-// 模拟药品数据
-const products = ref([
-  {
-    id: 1,
-    name: '布洛芬缓释胶囊',
-    price: 35.8,
-    stock: 100,
-    image: 'https://example.com/medicine1.jpg',
-    description: '用于缓解轻至中度疼痛',
-    prescription: false,
-    symptoms: '头痛、发热、关节痛',
-    usage: '口服，一次1粒，每日2次',
-    precautions: '空腹服用可能会出现胃部不适',
-    isFavorite: false
-  },
-  // ... 更多药品数据
-])
+// 药品数据
+const products = ref([])
+const loading = ref(false)
 
 // 详情弹窗
 const detailVisible = ref(false)
 const selectedProduct = ref(null)
+
+// 获取药品列表
+const fetchProducts = async () => {
+  loading.value = true
+  try {
+    // 直接从库存API获取产品数据
+    const res = await request({
+      url: `/inventory/store/${localStorage.getItem('currentStoreId')}`,
+      method: 'get',
+      params: {
+        keyword: searchForm.keyword,
+        page: pagination.current - 1,
+        size: pagination.pageSize
+      }
+    })
+    
+    // 库存数据已包含完整的产品信息
+    products.value = res.data.content || []
+    pagination.total = res.data.totalElements || 0
+  } catch (error) {
+    message.error('获取药品列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取库存状态
+const getStockStatus = (quantity) => {
+  if (quantity <= 0) return '缺货'
+  if (quantity <= 10) return '低库存'
+  return '充足'
+}
+
+// 获取库存状态颜色
+const getStockStatusColor = (quantity) => {
+  if (quantity <= 0) return 'red'
+  if (quantity <= 10) return 'orange'
+  return 'green'
+}
+
+// 获取库存数量的样式类
+const getStockClass = (quantity) => {
+  if (quantity <= 0) return 'stock-empty'
+  if (quantity <= 10) return 'stock-low'
+  return 'stock-normal'
+}
 
 // 收藏/取消收藏
 const toggleFavorite = (product) => {
@@ -162,14 +218,16 @@ const toggleFavorite = (product) => {
 
 // 处理搜索
 const handleSearch = () => {
-  // 实现搜索逻辑
-  console.log('搜索条件：', searchForm)
+  pagination.current = 1
+  fetchProducts()
 }
 
 // 重置搜索
 const resetSearch = () => {
   searchForm.keyword = ''
   searchForm.category = undefined
+  pagination.current = 1
+  fetchProducts()
 }
 
 // 显示详情
@@ -186,14 +244,23 @@ const closeDetails = () => {
 
 // 加入购物车
 const addToCart = (product) => {
+  if (!product.quantity) {
+    message.warning(`${product.name} 当前无库存`)
+    return
+  }
   message.success(`已将 ${product.name} 加入购物车`)
 }
 
 // 处理分页
 const handlePageChange = (page) => {
   pagination.current = page
-  // 加载对应页数据
+  fetchProducts()
 }
+
+// 初始化
+onMounted(() => {
+  fetchProducts()
+})
 </script>
 
 <style lang="less" scoped>
@@ -207,6 +274,10 @@ const handlePageChange = (page) => {
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(10px);
     }
+  }
+
+  .ant-tag {
+    margin-left: 10px;
   }
 
   .products-list {
@@ -232,6 +303,21 @@ const handlePageChange = (page) => {
         .stock {
           color: #8c8c8c;
           margin-bottom: 8px;
+          
+          .stock-empty {
+            color: #f5222d;
+            font-weight: bold;
+          }
+          
+          .stock-low {
+            color: #fa8c16;
+            font-weight: bold;
+          }
+          
+          .stock-normal {
+            color: #52c41a;
+            font-weight: bold;
+          }
         }
 
         .description {
@@ -296,6 +382,21 @@ const handlePageChange = (page) => {
     p {
       margin: 8px 0;
       line-height: 1.6;
+    }
+    
+    .stock-empty {
+      color: #f5222d;
+      font-weight: bold;
+    }
+    
+    .stock-low {
+      color: #fa8c16;
+      font-weight: bold;
+    }
+    
+    .stock-normal {
+      color: #52c41a;
+      font-weight: bold;
     }
   }
 }

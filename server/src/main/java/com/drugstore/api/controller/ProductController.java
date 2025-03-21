@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.persistence.criteria.Predicate;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -133,9 +134,29 @@ public class ProductController {
             product.setApprovalNumber(productRequest.getApprovalNumber());
             product.setRetailPrice(productRequest.getRetailPrice());
             product.setCostPrice(productRequest.getCostPrice());
+            
+            // 设置 price 字段，使用 retailPrice 的值
+            if (productRequest.getRetailPrice() != null) {
+                product.setPrice(productRequest.getRetailPrice());
+            } else {
+                product.setPrice(BigDecimal.ZERO);
+            }
+            
             product.setImage(productRequest.getImage());
             product.setDescription(productRequest.getDescription());
-            product.setUsage(productRequest.getUsage());
+            
+            // 设置库存，如果为null则默认为0
+            if (productRequest.getStock() != null) {
+                product.setStock(productRequest.getStock());
+            } else {
+                product.setStock(0);
+            }
+            
+            // 使用 setter 方法设置 usage 字段
+            if (productRequest.getUsage() != null) {
+                product.setUsage(productRequest.getUsage());
+            }
+            
             product.setStatus(productRequest.getStatus());
             
             // 保存药品
@@ -183,8 +204,19 @@ public class ProductController {
                 product.setApprovalNumber(productRequest.getApprovalNumber());
                 product.setRetailPrice(productRequest.getRetailPrice());
                 product.setCostPrice(productRequest.getCostPrice());
+                
+                // 设置 price 字段，使用 retailPrice 的值
+                if (productRequest.getRetailPrice() != null) {
+                    product.setPrice(productRequest.getRetailPrice());
+                }
+                
                 product.setImage(productRequest.getImage());
                 product.setDescription(productRequest.getDescription());
+                
+                // 设置库存，如果为null则保持原值
+                if (productRequest.getStock() != null) {
+                    product.setStock(productRequest.getStock());
+                }
                 
                 // 使用 setter 方法设置 usage 字段
                 if (productRequest.getUsage() != null) {

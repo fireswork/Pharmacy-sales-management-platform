@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/employee")
@@ -107,7 +108,8 @@ public class EmployeeController {
             }
             
             EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
-                employee.getEmployeeId(),
+                employee.getId(),
+                employee.getCode(),
                 employee.getName(),
                 employee.getPhoneNumber() != null ? employee.getPhoneNumber() : "",
                 employee.getEmail() != null ? employee.getEmail() : "",
@@ -151,91 +153,61 @@ public class EmployeeController {
 
     // 添加员工
     @PostMapping
-    public ResponseEntity<ApiResponse<EmployeeInfoResponse>> addEmployee(@RequestBody EmployeeRequest employeeRequest) {
-        // 检查用户名是否已存在
-        if (userRepository.findByUsername(employeeRequest.getUsername()) != null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiResponse<>(null, 400, "用户名已存在"));
+    public ResponseEntity<ApiResponse<Employee>> createEmployee(@RequestBody Employee employee) {
+        try {
+            // 生成员工编号
+            String code = generateEmployeeCode();
+            employee.setCode(code);
+            
+            // 创建关联的用户账号
+            User user = new User();
+            user.setUsername(code); // 使用员工编号作为用户名
+            user.setPassword(passwordEncoder.encode("123456")); // 加密默认密码
+            user.setRole("EMPLOYEE"); // 员工角色
+            user.setName(employee.getName());
+            user.setStatus("active");
+            
+            // 先保存用户
+            User savedUser = userRepository.save(user);
+            
+            // 设置员工关联的用户
+            employee.setUser(savedUser);
+            
+            // 保存员工信息
+            Employee savedEmployee = employeeRepository.save(employee);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new ApiResponse<>(savedEmployee, 201, "添加员工成功"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(null, 500, "添加员工失败: " + e.getMessage()));
         }
-        
-        // 创建用户
-        User user = new User();
-        user.setUsername(employeeRequest.getUsername());
-        // 默认密码为 123456
-        user.setPassword(passwordEncoder.encode("123456"));
-        user.setRole("employee");
-        
-        User savedUser = userRepository.save(user);
-        
-        // 创建员工
-        Employee employee = new Employee();
-        employee.setUser(savedUser);
-        employee.setName(employeeRequest.getName());
-        employee.setPhoneNumber(employeeRequest.getPhoneNumber());
-        employee.setEmail(employeeRequest.getEmail());
-        employee.setHireDate(employeeRequest.getHireDate() != null ? employeeRequest.getHireDate() : new Date());
-        employee.setStatus("在职");
-        
-        // 设置门店
-        if (employeeRequest.getStoreId() != null) {
-            Store store = storeRepository.findById(employeeRequest.getStoreId()).orElse(null);
-            if (store != null) {
-                employee.setStore(store);
-            }
-        }
-        
-        // 生成员工ID
-        long count = employeeRepository.countEmployees();
-        String employeeId = String.format("EMP%03d", count + 1);
-        employee.setEmployeeId(employeeId);
-        
-        // 保存员工信息
-        Employee savedEmployee = employeeRepository.save(employee);
-        
-        // 构建响应
-        StoreInfoResponse storeInfo = null;
-        if (savedEmployee.getStore() != null) {
-            Store store = savedEmployee.getStore();
-            storeInfo = new StoreInfoResponse(
-                store.getId(),
-                store.getCode(),
-                store.getName(),
-                store.getAddress() != null ? store.getAddress() : "",
-                store.getPhoneNumber() != null ? store.getPhoneNumber() : "",
-                store.getOpenTime() != null ? store.getOpenTime() : "",
-                store.getCloseTime() != null ? store.getCloseTime() : "",
-                store.getStatus()
-            );
-        }
-        
-        EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
-            savedEmployee.getEmployeeId(),
-            savedEmployee.getName(),
-            savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
-            savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
-            storeInfo,
-            savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
-            savedEmployee.getStatus()
-        );
-        
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(new ApiResponse<>(employeeInfo, 201, "员工添加成功"));
+    }
+
+    /**
+     * 生成员工编号
+     */
+    private String generateEmployeeCode() {
+        // 获取当前员工数量
+        long count = employeeRepository.count();
+        // 生成编号：EMP + 4位数字（从0001开始）
+        return "EMP" + String.format("%04d", count + 1);
     }
 
     // 更新员工状态
-    @PutMapping("/{employeeId}/status")
+    @PutMapping("/{id}/status")
     public ResponseEntity<ApiResponse<EmployeeInfoResponse>> updateEmployeeStatus(
-            @PathVariable String employeeId,
+            @PathVariable Long id,
             @RequestParam String status) {
         
         // 查找员工
-        Employee employee = employeeRepository.findByEmployeeId(employeeId);
+        Optional<Employee> employeeOpt = employeeRepository.findById(id);
         
-        if (employee == null) {
+        if (employeeOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiResponse<>(null, 404, "员工不存在"));
         }
         
+        Employee employee = employeeOpt.get();
         // 更新状态
         employee.setStatus(status);
         Employee savedEmployee = employeeRepository.save(employee);
@@ -257,7 +229,8 @@ public class EmployeeController {
         }
         
         EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
-            savedEmployee.getEmployeeId(),
+            savedEmployee.getId(),
+            savedEmployee.getCode(),
             savedEmployee.getName(),
             savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
             savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
@@ -270,16 +243,17 @@ public class EmployeeController {
     }
 
     // 重置员工密码
-    @PutMapping("/{employeeId}/reset-password")
-    public ResponseEntity<ApiResponse<Void>> resetEmployeePassword(@PathVariable String employeeId) {
+    @PutMapping("/{id}/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetEmployeePassword(@PathVariable Long id) {
         // 查找员工
-        Employee employee = employeeRepository.findByEmployeeId(employeeId);
+        Optional<Employee> employeeOpt = employeeRepository.findById(id);
         
-        if (employee == null) {
+        if (employeeOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiResponse<>(null, 404, "员工不存在"));
         }
         
+        Employee employee = employeeOpt.get();
         // 获取关联的用户
         User user = employee.getUser();
         
@@ -296,19 +270,20 @@ public class EmployeeController {
     }
 
     // 编辑员工
-    @PutMapping("/{employeeId}")
+    @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<EmployeeInfoResponse>> updateEmployee(
-            @PathVariable String employeeId,
+            @PathVariable Long id,
             @RequestBody EmployeeRequest employeeRequest) {
         
         // 查找员工
-        Employee employee = employeeRepository.findByEmployeeId(employeeId);
+        Optional<Employee> employeeOpt = employeeRepository.findById(id);
         
-        if (employee == null) {
+        if (employeeOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiResponse<>(null, 404, "员工不存在"));
         }
         
+        Employee employee = employeeOpt.get();
         // 更新员工信息
         if (employeeRequest.getName() != null) {
             employee.setName(employeeRequest.getName());
@@ -351,7 +326,8 @@ public class EmployeeController {
         }
         
         EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
-            savedEmployee.getEmployeeId(),
+            savedEmployee.getId(),
+            savedEmployee.getCode(),
             savedEmployee.getName(),
             savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
             savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",

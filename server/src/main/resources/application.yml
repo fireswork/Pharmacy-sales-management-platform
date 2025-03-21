@@ -22,6 +22,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        generate_statistics: true
 
 # 允许跨域的配置
   mvc:

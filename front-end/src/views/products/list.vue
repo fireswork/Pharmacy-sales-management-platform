@@ -1,6 +1,6 @@
 <template>
   <div class="products-container">
-    <a-card>
+    <a-card class="product-card">
       <!-- 搜索区域 -->
       <div class="filter-section">
         <a-space>
@@ -16,7 +16,11 @@
             placeholder="药品分类"
             allow-clear
           >
-            <a-select-option v-for="category in categoryOptions" :key="category.value" :value="category.value">
+            <a-select-option
+              v-for="category in categoryOptions"
+              :key="category.value"
+              :value="category.value"
+            >
               {{ category.label }}
             </a-select-option>
           </a-select>
@@ -50,19 +54,18 @@
         :data-source="productList"
         :pagination="pagination"
         :loading="loading"
-        :row-key="record => record.id"
+        :row-key="(record) => record.id"
         @change="handleTableChange"
+        bordered
+        class="product-table"
       >
         <!-- 药品图片 -->
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'image'">
-            <img
-              v-if="record.image"
-              :src="record.image"
-              alt="药品图片"
-              class="product-image"
-            />
-            <span v-else>无图片</span>
+            <div class="image-container">
+              <img v-if="record.image" :src="record.image" alt="药品图片" class="product-image" />
+              <span v-else>无图片</span>
+            </div>
           </template>
 
           <!-- 药品状态 -->
@@ -76,11 +79,7 @@
           <template v-if="column.dataIndex === 'action'">
             <a-space>
               <a-button type="link" @click="handleEdit(record)">编辑</a-button>
-              <a-button
-                type="link"
-                @click="handleToggleStatus(record)"
-                :disabled="toggleLoading"
-              >
+              <a-button type="link" @click="handleToggleStatus(record)" :disabled="toggleLoading">
                 {{ record.status === 'active' ? '下架' : '上架' }}
               </a-button>
             </a-space>
@@ -111,9 +110,18 @@
           <a-input v-model:value="formData.name" placeholder="请输入药品名称" />
         </a-form-item>
 
+        <a-form-item v-if="isEdit" label="药品编号">
+          <a-input v-model:value="formData.code" disabled />
+          <div class="form-item-tip">药品编号系统自动生成，不可修改</div>
+        </a-form-item>
+
         <a-form-item label="药品分类" name="category" required>
           <a-select v-model:value="formData.category" placeholder="请选择药品分类">
-            <a-select-option v-for="category in categoryOptions" :key="category.value" :value="category.value">
+            <a-select-option
+              v-for="category in categoryOptions"
+              :key="category.value"
+              :value="category.value"
+            >
               {{ category.label }}
             </a-select-option>
           </a-select>
@@ -153,13 +161,22 @@
           />
         </a-form-item>
 
+        <a-form-item label="库存数量" name="stock">
+          <a-input-number
+            v-model:value="formData.stock"
+            :min="0"
+            style="width: 100%"
+            placeholder="请输入库存数量"
+          />
+        </a-form-item>
+
         <a-form-item label="药品图片" name="image">
           <a-upload
             v-model:file-list="fileList"
             list-type="picture-card"
             :show-upload-list="false"
             :before-upload="beforeUpload"
-            @change="handleImageChange"
+            :customRequest="customUpload"
           >
             <img v-if="imageUrl" :src="imageUrl" alt="药品图片" class="upload-img" />
             <div v-else>
@@ -167,22 +184,15 @@
               <div class="ant-upload-text">上传图片</div>
             </div>
           </a-upload>
+          <div class="upload-tip" v-if="!imageUrl">支持JPG、PNG格式，大小不超过2MB</div>
         </a-form-item>
 
         <a-form-item label="药品介绍" name="description">
-          <a-textarea
-            v-model:value="formData.description"
-            :rows="4"
-            placeholder="请输入药品介绍"
-          />
+          <a-textarea v-model:value="formData.description" :rows="4" placeholder="请输入药品介绍" />
         </a-form-item>
 
         <a-form-item label="使用说明" name="usage">
-          <a-textarea
-            v-model:value="formData.usage"
-            :rows="4"
-            placeholder="请输入使用说明"
-          />
+          <a-textarea v-model:value="formData.usage" :rows="4" placeholder="请输入使用说明" />
         </a-form-item>
 
         <a-form-item label="状态" name="status">
@@ -213,7 +223,7 @@ const searchForm = ref({
 const productList = ref([])
 
 // 分页配置
-const pagination = reactive({
+const pagination = ref({
   current: 1,
   pageSize: 10,
   total: 0,
@@ -245,6 +255,7 @@ const formData = ref({
   approvalNumber: '',
   retailPrice: null,
   costPrice: null,
+  stock: 0,
   image: '',
   description: '',
   usage: '',
@@ -282,13 +293,17 @@ const columns = [
     title: '药品编号',
     dataIndex: 'code',
     key: 'code',
-    width: 120
+    width: 120,
   },
   {
     title: '分类',
     dataIndex: 'category',
     key: 'category',
-    width: 120
+    width: 100,
+    render: (text) => {
+      const category = categoryOptions.find(item => item.value === text)
+      return category ? category.label : text
+    }
   },
   {
     title: '规格',
@@ -301,14 +316,19 @@ const columns = [
     dataIndex: 'retailPrice',
     key: 'retailPrice',
     width: 100,
-    align: 'right',
-    render: (text) => `¥${text ? Number(text).toFixed(2) : '0.00'}`
+    render: (text) => (text ? `¥${text}` : '-')
+  },
+  {
+    title: '库存',
+    dataIndex: 'stock',
+    key: 'stock',
+    width: 80
   },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    width: 100
+    width: 80
   },
   {
     title: '操作',
@@ -320,34 +340,45 @@ const columns = [
 ]
 
 // 获取药品列表
-const fetchProducts = async () => {
+const fetchProducts = async (params = {}) => {
   try {
     loading.value = true
+    const { page = pagination.value.current - 1, size = pagination.value.pageSize } = params
     
-    const params = {
-      page: pagination.current - 1,  // Spring Data JPA 分页从0开始
-      size: pagination.pageSize,
+    // 构建查询参数
+    const queryParams = {
+      page,
+      size,
       sort: 'id',
       order: 'desc'
     }
     
-    if (searchForm.keyword) {
-      params.keyword = searchForm.keyword
+    // 添加筛选条件 - 修复：直接使用 searchForm 的值
+    if (searchForm.value.keyword?.trim()) {
+      queryParams.keyword = searchForm.value.keyword.trim()
     }
-    
-    if (searchForm.category) {
-      params.category = searchForm.category
+    if (searchForm.value.category) {
+      queryParams.category = searchForm.value.category
     }
-    
-    if (searchForm.status) {
-      params.status = searchForm.status
+    if (searchForm.value.status) {
+      queryParams.status = searchForm.value.status
     }
 
-    const response = await axios.get('/products', { params })
-
-    if (response.data && response.data) {
+    const response = await axios.get('/products', { 
+      params: queryParams,
+      // 确保正确处理参数
+      paramsSerializer: params => {
+        return Object.entries(params)
+          .filter(([_, value]) => value != null)
+          .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+          .join('&')
+      }
+    })
+    
+    if (response.code === 200) {
       productList.value = response.data.content
-      pagination.total = response.data.totalElements
+      pagination.value.total = response.data.totalElements
+      pagination.value.current = page + 1
     }
   } catch (error) {
     console.error('获取药品列表失败:', error)
@@ -358,16 +389,22 @@ const fetchProducts = async () => {
 }
 
 // 处理表格变化
-const handleTableChange = (pag) => {
-  pagination.current = pag.current
-  pagination.pageSize = pag.pageSize
-  fetchProducts()
+const handleTableChange = (pag, filters, sorter) => {
+  pagination.value.current = pag.current
+  pagination.value.pageSize = pag.pageSize
+  fetchProducts({
+    page: pag.current - 1, // 转换为后端分页
+    size: pag.pageSize
+  })
 }
 
 // 处理搜索
 const handleSearch = () => {
-  pagination.current = 1
-  fetchProducts()
+  pagination.value.current = 1 // 重置到第一页
+  fetchProducts({
+    page: 0, // 后端分页从0开始
+    size: pagination.value.pageSize
+  })
 }
 
 // 处理重置
@@ -377,8 +414,11 @@ const handleReset = () => {
     category: undefined,
     status: undefined
   }
-  pagination.current = 1
-  fetchProducts()
+  pagination.value.current = 1
+  fetchProducts({
+    page: 0,
+    size: pagination.value.pageSize
+  })
 }
 
 // 处理添加
@@ -394,6 +434,7 @@ const handleAdd = () => {
     approvalNumber: '',
     retailPrice: null,
     costPrice: null,
+    stock: 0,
     image: '',
     description: '',
     usage: '',
@@ -408,7 +449,7 @@ const handleAdd = () => {
 const handleEdit = (record) => {
   isEdit.value = true
   formData.value = { ...record }
-  
+
   if (record.image) {
     imageUrl.value = record.image
     fileList.value = [
@@ -423,7 +464,7 @@ const handleEdit = (record) => {
     imageUrl.value = ''
     fileList.value = []
   }
-  
+
   modalVisible.value = true
 }
 
@@ -432,9 +473,9 @@ const handleToggleStatus = async (record) => {
   try {
     toggleLoading.value = true
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
-    
+
     await axios.put(`/products/${record.id}/status`, { status: newStatus })
-    
+
     message.success(`${newStatus === 'active' ? '上架' : '下架'}成功`)
     fetchProducts()
   } catch (error) {
@@ -447,15 +488,9 @@ const handleToggleStatus = async (record) => {
 
 // 表单验证规则
 const rules = {
-  name: [
-    { required: true, message: '请输入药品名称', trigger: 'blur' }
-  ],
-  category: [
-    { required: true, message: '请选择药品分类', trigger: 'change' }
-  ],
-  retailPrice: [
-    { required: true, message: '请输入零售价', trigger: 'blur' }
-  ]
+  name: [{ required: true, message: '请输入药品名称', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择药品分类', trigger: 'change' }],
+  retailPrice: [{ required: true, message: '请输入零售价', trigger: 'blur' }]
 }
 
 // 图片上传前检查
@@ -463,27 +498,41 @@ const beforeUpload = (file) => {
   const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png'
   if (!isJpgOrPng) {
     message.error('只能上传JPG或PNG格式的图片!')
+    return false
   }
   const isLt2M = file.size / 1024 / 1024 < 2
   if (!isLt2M) {
     message.error('图片大小不能超过2MB!')
+    return false
   }
-  return isJpgOrPng && isLt2M
+
+  // 创建本地预览URL
+  const reader = new FileReader()
+  reader.readAsDataURL(file)
+  reader.onload = () => {
+    imageUrl.value = reader.result
+
+    // 更新文件列表，用于UI显示
+    fileList.value = [
+      {
+        uid: '-1',
+        name: file.name,
+        status: 'done',
+        url: reader.result
+      }
+    ]
+  }
+
+  // 返回false阻止默认上传行为
+  return false
 }
 
-// 处理图片变更
-const handleImageChange = (info) => {
-  if (info.file.status === 'uploading') {
-    return
-  }
-  if (info.file.status === 'done') {
-    // 实际项目中应该从响应中获取图片URL
-    // 这里模拟一个URL
-    imageUrl.value = URL.createObjectURL(info.file.originFileObj)
-    formData.value.image = imageUrl.value
-  } else if (info.file.status === 'error') {
-    message.error('图片上传失败')
-  }
+// 自定义上传方法 - 实际上不会发送请求，只是为了配合组件API
+const customUpload = ({ file, onSuccess }) => {
+  // 这里不做任何网络请求，只是模拟成功回调
+  setTimeout(() => {
+    onSuccess('ok', file)
+  }, 0)
 }
 
 // 处理表单提交
@@ -491,22 +540,24 @@ const handleModalSubmit = async () => {
   try {
     await formRef.value.validate()
     submitLoading.value = true
-    
+
     const requestData = {
       name: formData.value.name,
-      code: formData.value.code,
       category: formData.value.category,
       specification: formData.value.specification,
       manufacturer: formData.value.manufacturer,
       approvalNumber: formData.value.approvalNumber,
       retailPrice: formData.value.retailPrice,
       costPrice: formData.value.costPrice,
-      image: formData.value.image,
+      stock: formData.value.stock,
+      image: imageUrl.value, // 使用本地预览URL（base64数据）
       description: formData.value.description,
       usage: formData.value.usage,
       status: formData.value.status
     }
     
+    // 注意这里不包含 code 字段，因为它是自增的
+
     if (isEdit.value) {
       await axios.put(`/products/${formData.value.id}`, requestData)
       message.success('药品信息更新成功')
@@ -514,7 +565,7 @@ const handleModalSubmit = async () => {
       await axios.post('/products', requestData)
       message.success('药品添加成功')
     }
-    
+
     modalVisible.value = false
     fetchProducts()
   } catch (error) {
@@ -535,28 +586,64 @@ onMounted(() => {
 .products-container {
   padding: 16px;
 
+  .product-card {
+    border-radius: 8px;
+    box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09);
+  }
+
   .filter-section {
     margin-bottom: 24px;
     padding: 24px;
     background: #fafafa;
     border-radius: 4px;
+    border: 1px solid #f0f0f0;
+  }
+
+  .product-table {
+    margin-top: 16px;
+    
+    :deep(.ant-table-thead > tr > th) {
+      background-color: #f5f7fa;
+      font-weight: 600;
+    }
+    
+    :deep(.ant-table-tbody > tr:hover > td) {
+      background-color: #e6f7ff;
+    }
+  }
+
+  .image-container {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #f9f9f9;
   }
 
   .product-image {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 4px;
-  }
-
-  .upload-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
   }
 
   :deep(.ant-form-item) {
     margin-bottom: 24px;
   }
+  
+  .form-item-tip {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
 }
-</style> 
+
+:deep(.upload-img) {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+</style>

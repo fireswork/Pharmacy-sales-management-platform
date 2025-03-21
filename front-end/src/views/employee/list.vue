@@ -49,7 +49,7 @@
         :data-source="employeeList"
         :pagination="pagination"
         :loading="loading"
-        :row-key="record => record.employeeId"
+        :row-key="record => record.code"
         bordered
         @change="handleTableChange"
       >
@@ -96,7 +96,7 @@
         :wrapper-col="{ span: 16 }"
       >
         <a-form-item v-if="isEdit" label="员工工号">
-          <a-input v-model:value="formData.employeeId" disabled />
+          <a-input v-model:value="formData.code" disabled />
         </a-form-item>
 
         <a-form-item label="员工姓名" name="name" required>
@@ -177,7 +177,7 @@ const pagination = reactive({
 const columns = [
   {
     title: '工号',
-    dataIndex: 'employeeId',
+    dataIndex: 'code',
     width: 100,
   },
   {
@@ -199,6 +199,9 @@ const columns = [
     title: '入职日期',
     dataIndex: 'hireDate',
     width: 120,
+    customRender: ({text}) => {
+      return text ? dayjs(text).format('YYYY-MM-DD') : ''
+    }
   },
   {
     title: '状态',
@@ -226,7 +229,7 @@ const formRef = ref(null)
 
 // 表单数据
 const formData = reactive({
-  employeeId: '',
+  code: '',
   name: '',
   phoneNumber: '',
   email: '',
@@ -342,7 +345,7 @@ const handleReset = () => {
 // 处理添加
 const handleAdd = () => {
   isEdit.value = false
-  formData.employeeId = ''
+  formData.code = ''
   formData.name = ''
   formData.phoneNumber = ''
   formData.email = ''
@@ -355,13 +358,14 @@ const handleAdd = () => {
 // 处理编辑
 const handleEdit = (record) => {
   isEdit.value = true
-  formData.employeeId = record.employeeId
+  formData.code = record.code
   formData.name = record.name
   formData.phoneNumber = record.phoneNumber
   formData.email = record.email
   formData.storeId = record.store ? record.store.id : undefined
   formData.hireDate = record.hireDate ? dayjs(record.hireDate) : null
   formData.status = record.status
+  formData.id = record.id
   modalVisible.value = true
 }
 
@@ -382,7 +386,7 @@ const handleModalSubmit = async () => {
     
     if (isEdit.value) {
       // 编辑员工
-      await axios.put(`/employee/${formData.employeeId}`, requestData)
+      await axios.put(`/employee/${formData.id}`, requestData)
       message.success('员工信息更新成功')
     } else {
       // 添加员工
@@ -406,7 +410,7 @@ const handleStatusChange = async (record) => {
     const newStatus = record.status === '在职' ? '离职' : '在职'
     const action = newStatus === '在职' ? '复职' : '离职'
     
-    await axios.put(`/employee/${record.employeeId}/status`, null, {
+    await axios.put(`/employee/${record.id}/status`, null, {
       params: { status: newStatus }
     })
     
@@ -421,7 +425,7 @@ const handleStatusChange = async (record) => {
 // 处理重置密码
 const handleResetPassword = async (record) => {
   try {
-    await axios.put(`/employee/${record.employeeId}/reset-password`)
+    await axios.put(`/employee/${record.id}/reset-password`)
     message.success(`已重置 ${record.name} 的密码为: 123456`)
   } catch (error) {
     console.error('重置密码失败:', error)

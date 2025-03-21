@@ -16,6 +16,7 @@ public class ProductRequest {
     private String description;
     private String usage;
     private String status;
+    private Integer stock;
     
     // Getters and Setters
     public String getName() {
@@ -120,5 +121,13 @@ public class ProductRequest {
     
     public void setStatus(String status) {
         this.status = status;
+    }
+    
+    public Integer getStock() {
+        return stock;
+    }
+    
+    public void setStock(Integer stock) {
+        this.stock = stock;
     }
 } 

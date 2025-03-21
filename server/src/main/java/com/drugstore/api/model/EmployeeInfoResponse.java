@@ -1,7 +1,8 @@
 package com.drugstore.api.model;
 
 public class EmployeeInfoResponse {
-    private String employeeId;
+    private Long id;
+    private String code;
     private String name;
     private String phoneNumber;
     private String email;
@@ -9,9 +10,10 @@ public class EmployeeInfoResponse {
     private String hireDate;
     private String status;
 
-    public EmployeeInfoResponse(String employeeId, String name, String phoneNumber, String email, 
-                               StoreInfoResponse store, String hireDate, String status) {
-        this.employeeId = employeeId;
+    public EmployeeInfoResponse(Long id, String code, String name, String phoneNumber, String email, 
+                              StoreInfoResponse store, String hireDate, String status) {
+        this.id = id;
+        this.code = code;
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.email = email;
@@ -20,13 +22,20 @@ public class EmployeeInfoResponse {
         this.status = status;
     }
 
-    // Getters and Setters
-    public String getEmployeeId() {
-        return employeeId;
+    public Long getId() {
+        return id;
     }
 
-    public void setEmployeeId(String employeeId) {
-        this.employeeId = employeeId;
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getName() {

@@ -1,125 +1,132 @@
 <template>
   <a-layout class="layout">
-    <a-layout-header class="header">
-      <div class="header-left">
-        <div class="logo">
-          <svg class="logo-icon" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M20,6H16V4A2,2 0 0,0 14,2H10A2,2 0 0,0 8,4V6H4C2.89,6 2,6.89 2,8V19A2,2 0 0,0 4,21H20A2,2 0 0,0 22,19V8C22,6.89 21.1,6 20,6M10,4H14V6H10V4M20,19H4V8H20V19M6,10H8V12H6V10M6,14H8V16H6V14M10,10H18V12H10V10M10,14H15V16H10V14Z"
-            />
-          </svg>
-          <span>药品管理系统</span>
+    <a-spin :spinning="loading" tip="加载中..." size="large" class="global-loading">
+      <a-layout-header class="header">
+        <div class="header-left">
+          <div class="logo">
+            <svg class="logo-icon" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M20,6H16V4A2,2 0 0,0 14,2H10A2,2 0 0,0 8,4V6H4C2.89,6 2,6.89 2,8V19A2,2 0 0,0 4,21H20A2,2 0 0,0 22,19V8C22,6.89 21.1,6 20,6M10,4H14V6H10V4M20,19H4V8H20V19M6,10H8V12H6V10M6,14H8V16H6V14M10,10H18V12H10V10M10,14H15V16H10V14Z"
+              />
+            </svg>
+            <span>药品管理系统</span>
+          </div>
+          <a-select
+            v-model:value="currentStoreId"
+            style="width: 200px"
+            placeholder="请选择门店"
+            @change="handleStoreChange"
+          >
+            <a-select-option v-for="store in stores" :key="store.id" :value="store.id">
+              {{ store?.name }}
+            </a-select-option>
+          </a-select>
         </div>
-        <a-select v-model:value="selectedStore" placeholder="请选择药店" class="store-select">
-          <a-select-option v-for="store in stores" :key="store.id" :value="store.id">
-            {{ store.name }}
-          </a-select-option>
-        </a-select>
-      </div>
 
-      <div class="header-right">
-        <a-dropdown>
-          <a class="ant-dropdown-link user-dropdown" @click.prevent>
-            <a-avatar class="user-avatar">
+        <div class="header-right">
+          <a-dropdown>
+            <a class="ant-dropdown-link user-dropdown" @click.prevent>
+              <a-avatar class="user-avatar">
+                <template #icon><UserOutlined /></template>
+              </a-avatar>
+              <span class="username">{{ userInfo?.username || '未登录' }}</span>
+              <DownOutlined />
+            </a>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="profile">
+                  <router-link to="/home/user/profile">个人信息</router-link>
+                </a-menu-item>
+                <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+        </div>
+      </a-layout-header>
+
+      <a-layout>
+        <a-layout-sider width="240" class="sider">
+          <a-menu
+            v-model:selectedKeys="selectedKeys"
+            v-model:openKeys="openKeys"
+            mode="inline"
+            class="side-menu"
+          >
+            <a-menu-item key="products">
+              <template #icon><MedicineBoxOutlined /></template>
+              <router-link to="/home/products">药品列表</router-link>
+            </a-menu-item>
+            <a-menu-item key="productsManagement">
+              <template #icon><DatabaseOutlined /></template>
+              <router-link to="/home/productsManagement">药品管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="purchaseManagement">
+              <template #icon><ShoppingCartOutlined /></template>
+              <router-link to="/home/purchaseManagement">采购管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="supplierManagement">
+              <template #icon><TeamOutlined /></template>
+              <router-link to="/home/supplierManagement">供应商管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="storeManagement">
+              <template #icon><ShopOutlined /></template>
+              <router-link to="/home/storeManagement">分店管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="memberManagement">
+              <template #icon><CrownOutlined /></template>
+              <router-link to="/home/memberManagement">会员管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="employeeManagement">
+              <template #icon><ShopOutlined /></template>
+              <router-link to="/home/employeeManagement">员工管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="order">
+              <template #icon><OrderedListOutlined /></template>
+              <router-link to="/home/order">订单管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="warehouse">
+              <template #icon><InboxOutlined /></template>
+              <router-link to="/home/warehouse">仓库管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="finance">
+              <template #icon><AccountBookOutlined /></template>
+              <router-link to="/home/finance">财务管理</router-link>
+            </a-menu-item>
+            <a-menu-item key="cart">
+              <template #icon><ShoppingOutlined /></template>
+              <router-link to="/home/cart">购物车</router-link>
+            </a-menu-item>
+
+            <a-sub-menu key="user">
               <template #icon><UserOutlined /></template>
-            </a-avatar>
-            <span class="username">{{ userName || '未登录' }}</span>
-            <DownOutlined />
-          </a>
-          <template #overlay>
-            <a-menu>
+              <template #title>个人中心</template>
               <a-menu-item key="profile">
                 <router-link to="/home/user/profile">个人信息</router-link>
               </a-menu-item>
-              <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-      </div>
-    </a-layout-header>
+              <a-menu-item key="userAddress">
+                <router-link to="/home/user/address">收货地址</router-link>
+              </a-menu-item>
+              <a-menu-item key="userOrders">
+                <router-link to="/home/user/orders">我的订单</router-link>
+              </a-menu-item>
+              <a-menu-item key="favorites">
+                <template #icon><HeartOutlined /></template>
+                <router-link to="/home/user/favorites">我的收藏</router-link>
+              </a-menu-item>
+              <a-menu-item key="reviews">
+                <template #icon><CommentOutlined /></template>
+                <router-link to="/home/user/reviews">我的评价</router-link>
+              </a-menu-item>
+            </a-sub-menu>
+          </a-menu>
+        </a-layout-sider>
 
-    <a-layout>
-      <a-layout-sider width="240" class="sider">
-        <a-menu
-          v-model:selectedKeys="selectedKeys"
-          v-model:openKeys="openKeys"
-          mode="inline"
-          class="side-menu"
-        >
-          <a-menu-item key="products">
-            <template #icon><MedicineBoxOutlined /></template>
-            <router-link to="/home/products">药品列表</router-link>
-          </a-menu-item>
-          <a-menu-item key="productsManagement">
-            <template #icon><DatabaseOutlined /></template>
-            <router-link to="/home/productsManagement">药品管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="purchaseManagement">
-            <template #icon><ShoppingCartOutlined /></template>
-            <router-link to="/home/purchaseManagement">采购管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="supplierManagement">
-            <template #icon><TeamOutlined /></template>
-            <router-link to="/home/supplierManagement">供应商管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="storeManagement">
-            <template #icon><ShopOutlined /></template>
-            <router-link to="/home/storeManagement">分店管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="memberManagement">
-            <template #icon><CrownOutlined /></template>
-            <router-link to="/home/memberManagement">会员管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="employeeManagement">
-            <template #icon><ShopOutlined /></template>
-            <router-link to="/home/employeeManagement">员工管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="order">
-            <template #icon><OrderedListOutlined /></template>
-            <router-link to="/home/order">订单管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="warehouse">
-            <template #icon><InboxOutlined /></template>
-            <router-link to="/home/warehouse">仓库管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="finance">
-            <template #icon><AccountBookOutlined /></template>
-            <router-link to="/home/finance">财务管理</router-link>
-          </a-menu-item>
-          <a-menu-item key="cart">
-            <template #icon><ShoppingOutlined /></template>
-            <router-link to="/home/cart">购物车</router-link>
-          </a-menu-item>
-
-          <a-sub-menu key="user">
-            <template #icon><UserOutlined /></template>
-            <template #title>个人中心</template>
-            <a-menu-item key="profile">
-              <router-link to="/home/user/profile">个人信息</router-link>
-            </a-menu-item>
-            <a-menu-item key="userAddress">
-              <router-link to="/home/user/address">收货地址</router-link>
-            </a-menu-item>
-            <a-menu-item key="userOrders">
-              <router-link to="/home/user/orders">我的订单</router-link>
-            </a-menu-item>
-            <a-menu-item key="favorites">
-              <template #icon><HeartOutlined /></template>
-              <router-link to="/home/user/favorites">我的收藏</router-link>
-            </a-menu-item>
-            <a-menu-item key="reviews">
-              <template #icon><CommentOutlined /></template>
-              <router-link to="/home/user/reviews">我的评价</router-link>
-            </a-menu-item>
-          </a-sub-menu>
-        </a-menu>
-      </a-layout-sider>
-
-      <a-layout-content class="content">
-        <router-view></router-view>
-      </a-layout-content>
-    </a-layout>
+        <a-layout-content class="content">
+          <router-view></router-view>
+        </a-layout-content>
+      </a-layout>
+    </a-spin>
   </a-layout>
 </template>
 
@@ -153,8 +160,10 @@ const router = useRouter()
 const selectedKeys = ref(['products'])
 const openKeys = ref(['user'])
 
+// 添加 loading 状态
+const loading = ref(true)
+
 // 用户信息相关
-const userName = ref('')
 const userInfo = ref(null)
 
 // 获取用户信息的方法
@@ -162,22 +171,53 @@ const getUserInfo = async () => {
   const response = await axios.get('/user')
   if (response.code === 200) {
     userInfo.value = response.data
-    userName.value = response.data.username
   }
 }
 
-// 在组件挂载时获取用户信息
-onMounted(() => {
-  getUserInfo()
-})
+// 添加门店选择相关数据
+const currentStoreId = ref(null)
+const stores = ref([])
 
-// 添加药店选择相关数据
-const selectedStore = ref(null)
-const stores = ref([
-  { id: 1, name: 'XX大药房(总店)' },
-  { id: 2, name: 'XX大药房(分店1)' },
-  { id: 3, name: 'XX大药房(分店2)' }
-])
+// 获取门店列表
+const fetchStores = async () => {
+  try {
+    // 从 localStorage 获取上次选择的门店 ID
+    const savedStoreId = localStorage.getItem('currentStoreId')
+    if (savedStoreId) {
+      currentStoreId.value = parseInt(savedStoreId)
+    }
+    
+    const res = await axios.get('/store')
+    stores.value = res.data.content || []
+    
+    // 如果有门店数据，且没有从 localStorage 获取到门店 ID，则默认选择第一个
+    if (stores.value.length > 0 && !currentStoreId.value) {
+      currentStoreId.value = stores.value[0].id
+      // 保存到 localStorage
+      localStorage.setItem('currentStoreId', currentStoreId.value)
+    }
+    router.push('/home/products')
+  } catch (error) {
+    message.error('获取门店列表失败')
+  } finally {
+    // 无论成功失败，都关闭 loading
+    loading.value = false
+  }
+}
+
+// 切换门店
+const handleStoreChange = (storeId) => {
+  currentStoreId.value = storeId
+  // 保存到 localStorage
+  localStorage.setItem('currentStoreId', storeId)
+  message.success('已切换到新门店')
+  
+  // 如果当前在产品或库存页面，刷新数据
+  const currentPath = router.currentRoute.value.path
+  if (currentPath.includes('/products') || currentPath.includes('/inventory')) {
+    router.go(0)  // 刷新当前页面
+  }
+}
 
 // 修改路由监听逻辑
 watch(
@@ -200,12 +240,39 @@ const handleLogout = () => {
   message.success('退出成功')
   router.push('/login')
 }
+
+// 在组件挂载时获取用户信息和门店列表
+onMounted(() => {
+  getUserInfo()
+  fetchStores()
+})
 </script>
 
 <style lang="less" scoped>
 .layout {
   min-height: 100vh;
   background: #f0f2f5;
+}
+
+.global-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  
+  :deep(.ant-spin-container) {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.ant-layout {
+  height: calc(100vh - 64px);
 }
 
 .header {

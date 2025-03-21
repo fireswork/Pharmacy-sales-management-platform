@@ -39,20 +39,20 @@ public class Product {
     @Column(precision = 10, scale = 2)
     private BigDecimal costPrice; // 成本价格
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "LONGTEXT")
     private String image; // 图片
 
     @Column(length = 2000)
     private String description; // 描述
 
-    @Column(length = 2000)
-    private String usage; // 使用方法
+    @Column(name = "`usage`", length = 2000)
+    private String productUsage; // 使用方法
 
     @Column(nullable = false)
     private String status = "active"; // 状态
 
-    @Column
-    private Integer stock; // 库存
+    @Column(nullable = false)
+    private Integer stock = 0; // 库存，默认为0
 
     @Column(columnDefinition = "TEXT")
     private String symptoms; // 适用症状
@@ -71,6 +71,9 @@ public class Product {
 
     @Column
     private String imageUrl; // 图片URL
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price = BigDecimal.ZERO; // 价格，默认为0
 
     // Getters and Setters
     public Long getId() {
@@ -170,11 +173,11 @@ public class Product {
     }
 
     public String getUsage() {
-        return usage;
+        return productUsage;
     }
 
     public void setUsage(String usage) {
-        this.usage = usage;
+        this.productUsage = usage;
     }
 
     public String getStatus() {
@@ -239,5 +242,13 @@ public class Product {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
     }
 } 
