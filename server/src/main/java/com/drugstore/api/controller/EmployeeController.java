@@ -153,17 +153,33 @@ public class EmployeeController {
 
     // 添加员工
     @PostMapping
-    public ResponseEntity<ApiResponse<Employee>> createEmployee(@RequestBody Employee employee) {
+    public ResponseEntity<ApiResponse<EmployeeInfoResponse>> createEmployee(@RequestBody EmployeeRequest employeeRequest) {
         try {
+            // 创建新员工对象
+            Employee employee = new Employee();
+            employee.setName(employeeRequest.getName());
+            employee.setPhoneNumber(employeeRequest.getPhoneNumber());
+            employee.setEmail(employeeRequest.getEmail());
+            employee.setHireDate(employeeRequest.getHireDate());
+            employee.setStatus("在职");
+            
+            // 设置门店
+            if (employeeRequest.getStoreId() != null) {
+                Store store = storeRepository.findById(employeeRequest.getStoreId()).orElse(null);
+                if (store != null) {
+                    employee.setStore(store);
+                }
+            }
+
             // 生成员工编号
             String code = generateEmployeeCode();
             employee.setCode(code);
             
             // 创建关联的用户账号
             User user = new User();
-            user.setUsername(code); // 使用员工编号作为用户名
-            user.setPassword(passwordEncoder.encode("123456")); // 加密默认密码
-            user.setRole("EMPLOYEE"); // 员工角色
+            user.setUsername(code);
+            user.setPassword(passwordEncoder.encode("123456"));
+            user.setRole("EMPLOYEE");
             user.setName(employee.getName());
             user.setStatus("active");
             
@@ -175,8 +191,36 @@ public class EmployeeController {
             
             // 保存员工信息
             Employee savedEmployee = employeeRepository.save(employee);
+
+            // 构建响应
+            StoreInfoResponse storeInfo = null;
+            if (savedEmployee.getStore() != null) {
+                Store store = savedEmployee.getStore();
+                storeInfo = new StoreInfoResponse(
+                    store.getId(),
+                    store.getCode(),
+                    store.getName(),
+                    store.getAddress() != null ? store.getAddress() : "",
+                    store.getPhoneNumber() != null ? store.getPhoneNumber() : "",
+                    store.getOpenTime() != null ? store.getOpenTime() : "",
+                    store.getCloseTime() != null ? store.getCloseTime() : "",
+                    store.getStatus()
+                );
+            }
+            
+            EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
+                savedEmployee.getId(),
+                savedEmployee.getCode(),
+                savedEmployee.getName(),
+                savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
+                savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
+                storeInfo,
+                savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
+                savedEmployee.getStatus()
+            );
+
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponse<>(savedEmployee, 201, "添加员工成功"));
+                    .body(new ApiResponse<>(employeeInfo, 201, "添加员工成功"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ApiResponse<>(null, 500, "添加员工失败: " + e.getMessage()));
@@ -187,10 +231,20 @@ public class EmployeeController {
      * 生成员工编号
      */
     private String generateEmployeeCode() {
-        // 获取当前员工数量
-        long count = employeeRepository.count();
-        // 生成编号：EMP + 4位数字（从0001开始）
-        return "EMP" + String.format("%04d", count + 1);
+        String maxEmployeeCode = employeeRepository.findTopByOrderByCodeDesc()
+            .map(Employee::getCode)
+            .orElse("EMP0000");
+        
+        String maxUserCode = userRepository.findTopByUsernameStartingWithOrderByUsernameDesc("EMP")
+            .map(User::getUsername)
+            .orElse("EMP0000");
+        
+        // 比较两个编号，取较大的那个
+        int employeeSeq = Integer.parseInt(maxEmployeeCode.substring(3));
+        int userSeq = Integer.parseInt(maxUserCode.substring(3));
+        int sequence = Math.max(employeeSeq, userSeq) + 1;
+        
+        return "EMP" + String.format("%04d", sequence);
     }
 
     // 更新员工状态

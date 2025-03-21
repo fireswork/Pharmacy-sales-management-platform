@@ -244,8 +244,12 @@ const columns = [
   },
   {
     title: '供应商',
-    dataIndex: 'supplierName',
-    width: 200
+    dataIndex: 'supplierId',
+    width: 200,
+    customRender: ({ text }) => {
+      const supplier = supplierOptions.value.find(s => s.id === text)
+      return supplier ? supplier.name : '-'
+    }
   },
   {
     title: '申请人',
