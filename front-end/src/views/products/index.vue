@@ -164,11 +164,31 @@ const loading = ref(false)
 const detailVisible = ref(false)
 const selectedProduct = ref(null)
 
+// 获取收藏列表
+const fetchFavorites = async () => {
+  try {
+    const res = await request({
+      url: '/favorites',
+      method: 'get',
+      params: {
+        storeId: localStorage.getItem('currentStoreId')
+      }
+    })
+    // 更新产品的收藏状态
+    const favoriteProductIds = res.data.map(item => item.productId)
+    products.value = products.value.map(product => ({
+      ...product,
+      isFavorite: favoriteProductIds.includes(product.id)
+    }))
+  } catch (error) {
+    message.error('获取收藏列表失败')
+  }
+}
+
 // 获取药品列表
 const fetchProducts = async () => {
   loading.value = true
   try {
-    // 直接从库存API获取产品数据
     const res = await request({
       url: `/inventory/store/${localStorage.getItem('currentStoreId')}`,
       method: 'get',
@@ -179,9 +199,11 @@ const fetchProducts = async () => {
       }
     })
     
-    // 库存数据已包含完整的产品信息
     products.value = res.data.content || []
     pagination.total = res.data.totalElements || 0
+    
+    // 获取收藏状态
+    await fetchFavorites()
   } catch (error) {
     message.error('获取药品列表失败')
   } finally {
@@ -211,9 +233,34 @@ const getStockClass = (quantity) => {
 }
 
 // 收藏/取消收藏
-const toggleFavorite = (product) => {
-  product.isFavorite = !product.isFavorite
-  message.success(product.isFavorite ? '收藏成功' : '已取消收藏')
+const toggleFavorite = async (product) => {
+  try {
+    if (product.isFavorite) {
+      // 取消收藏
+      await request({
+        url: `/favorites/${product.id}`,
+        method: 'delete',
+        params: {
+          storeId: localStorage.getItem('currentStoreId')
+        }
+      })
+      message.success('已取消收藏')
+    } else {
+      // 添加收藏
+      await request({
+        url: `/favorites/${product.id}`,
+        method: 'post',
+        params: {
+          storeId: localStorage.getItem('currentStoreId')
+        }
+      })
+      message.success('收藏成功')
+    }
+    // 更新产品的收藏状态
+    product.isFavorite = !product.isFavorite
+  } catch (error) {
+    message.error(error.response?.data?.message || '操作失败')
+  }
 }
 
 // 处理搜索

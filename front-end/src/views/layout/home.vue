@@ -201,7 +201,6 @@ const fetchStores = async () => {
       // 保存到 localStorage
       localStorage.setItem('currentStoreId', currentStoreId.value)
     }
-    router.push('/home/products')
   } catch (error) {
     message.error('获取门店列表失败')
   } finally {
