@@ -20,6 +20,22 @@
             <a-select-option value="approved">已通过</a-select-option>
             <a-select-option value="rejected">已拒绝</a-select-option>
           </a-select>
+          <!-- 门店筛选，仅管理员可见 -->
+          <a-select
+            v-if="userRole === 'ADMIN'"
+            v-model:value="searchForm.storeId"
+            style="width: 180px"
+            placeholder="选择门店"
+            allow-clear
+          >
+            <a-select-option
+              v-for="store in storeOptions"
+              :key="store.id"
+              :value="store.id"
+            >
+              {{ store.name }}
+            </a-select-option>
+          </a-select>
           <a-date-picker
             v-model:value="searchForm.date"
             style="width: 200px"
@@ -29,11 +45,12 @@
             <template #icon><SearchOutlined /></template>
             查询
           </a-button>
+
           <a-button @click="handleReset">
             <template #icon><ReloadOutlined /></template>
             重置
           </a-button>
-          <a-button type="primary" @click="handleAdd">
+          <a-button type="primary" @click="handleAdd" v-if="userRole === 'EMPLOYEE'">
             <template #icon><PlusOutlined /></template>
             新增采购
           </a-button>
@@ -48,6 +65,7 @@
         :row-key="(record) => record.id"
         bordered
         :loading="loading"
+        :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, record }">
           <!-- 状态列 -->
@@ -62,10 +80,8 @@
             <a-space>
               <a-button type="link" size="small" @click="handleView(record)">查看</a-button>
               <template v-if="isAdmin && record.status === 'pending'">
-                <a-button type="link" size="small" @click="handleApprove(record)">通过</a-button>
-                <a-button type="link" size="small" danger @click="handleReject(record)"
-                  >拒绝</a-button
-                >
+                <a-button type="link" size="small" @click="handleApprove(record)" v-if="userRole === 'ADMIN'">通过</a-button>
+                <a-button type="link" size="small" danger @click="handleReject(record)" v-if="userRole === 'ADMIN'">拒绝</a-button>
               </template>
             </a-space>
           </template>
@@ -220,13 +236,17 @@ import { message, Modal, Input } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import request from '@/utils/axios'
 
+const userRole = ref(localStorage.getItem('userRole'))
+console.log(userRole.value, 123)
+
 // 是否是管理员
-const isAdmin = ref(true) // 这里应该根据实际登录用户角色判断
+const isAdmin = ref(userRole.value === 'ADMIN')
 
 // 搜索表单
 const searchForm = ref({
-  // keyword: '',
+  keyword: '',
   status: undefined,
+  storeId: undefined,
   date: null
 })
 
@@ -255,6 +275,12 @@ const columns = [
     title: '申请人',
     dataIndex: 'applicant',
     width: 120
+  },
+  // 添加门店列，只有管理员才会看到
+  {
+    title: '所属门店',
+    dataIndex: 'storeName',
+    width: 150,
   },
   {
     title: '申请时间',
@@ -320,9 +346,10 @@ const getStatusText = (status) => {
 const purchaseList = ref([])
 const loading = ref(false)
 
-// 供应商和药品选项
+// 供应商、药品和门店选项
 const supplierOptions = ref([])
 const productOptions = ref([])
+const storeOptions = ref([])
 
 // 拒绝原因
 const rejectReason = ref('')
@@ -387,6 +414,19 @@ const rejectPurchase = (id, comment) => {
   })
 }
 
+// 获取门店列表
+const fetchStoreList = async () => {
+  try {
+    const res = await request({
+      url: '/store',
+      method: 'get'
+    })
+    storeOptions.value = res.data.content || []
+  } catch (error) {
+    message.error('获取门店列表失败')
+  }
+}
+
 // 获取采购列表
 const fetchPurchaseList = async () => {
   loading.value = true
@@ -394,6 +434,7 @@ const fetchPurchaseList = async () => {
     const params = {
       keyword: searchForm.value.keyword,
       status: searchForm.value.status,
+      storeId: searchForm.value.storeId,
       date: searchForm.value.date ? searchForm.value.date.format('YYYY-MM-DD') : undefined,
       page: pagination.value.current - 1, // 后端页码从 0 开始
       size: pagination.value.pageSize // 使用 size 而不是 pageSize
@@ -466,8 +507,9 @@ const handleSearch = () => {
 
 const handleReset = () => {
   searchForm.value = {
-    // keyword: '',
+    keyword: '',
     status: undefined,
+    storeId: undefined,
     date: null
   }
   handleSearch()
@@ -493,6 +535,7 @@ const handleView = (record) => {
 }
 
 const handleModalSubmit = () => {
+  userRole.value === 'ADMIN' ? modalVisible.value = false : 
   formRef.value.validate().then(async () => {
     submitLoading.value = true
     try {
@@ -644,6 +687,7 @@ const fetchProductList = async () => {
 onMounted(() => {
   fetchSupplierList()
   fetchProductList()
+  fetchStoreList()
   fetchPurchaseList()
 })
 </script>

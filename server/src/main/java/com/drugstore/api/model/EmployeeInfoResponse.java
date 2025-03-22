@@ -6,17 +6,19 @@ public class EmployeeInfoResponse {
     private String name;
     private String phoneNumber;
     private String email;
+    private String gender;
     private StoreInfoResponse store;
     private String hireDate;
     private String status;
 
     public EmployeeInfoResponse(Long id, String code, String name, String phoneNumber, String email, 
-                              StoreInfoResponse store, String hireDate, String status) {
+                              String gender, StoreInfoResponse store, String hireDate, String status) {
         this.id = id;
         this.code = code;
         this.name = name;
         this.phoneNumber = phoneNumber;
         this.email = email;
+        this.gender = gender;
         this.store = store;
         this.hireDate = hireDate;
         this.status = status;
@@ -60,6 +62,14 @@ public class EmployeeInfoResponse {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 
     public StoreInfoResponse getStore() {

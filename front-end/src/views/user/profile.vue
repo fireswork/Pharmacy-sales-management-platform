@@ -15,14 +15,14 @@
           </a-descriptions-item>
           <a-descriptions-item label="角色">
             <a-tag :color="getRoleColor(userInfo.role)">
-              {{ getRoleText(userInfo.role) }}
+              {{ getRoleText(userInfo.role.toLowerCase()) }}
             </a-tag>
           </a-descriptions-item>
         </a-descriptions>
       </a-card>
 
       <!-- 用户信息卡片 -->
-      <a-card title="用户信息" class="profile-card" :bordered="false">
+      <a-card title="用户信息" class="profile-card" :bordered="false" v-if="userInfo.role?.toUpperCase() !== 'ADMIN'">
         <template #extra>
           <a-button type="primary" @click="handleSubmit" :loading="loading" class="submit-btn">
             保存修改
@@ -65,7 +65,7 @@
             </a-radio-group>
           </a-form-item>
 
-          <a-form-item label="生日" name="birthday">
+          <a-form-item label="生日" name="birthday" v-if="userInfo.role?.toUpperCase() === 'USER'">
             <a-date-picker
               v-model:value="formData.birthday"
               style="width: 100%"
@@ -74,40 +74,64 @@
               placeholder="请选择生日"
             />
           </a-form-item>
+          
+          <!-- 员工特有信息 -->
+          <template v-if="userInfo.role?.toUpperCase() === 'EMPLOYEE'">
+            <a-form-item label="员工编号">
+              <span class="info-value">{{ employeeInfo.code || '无' }}</span>
+            </a-form-item>
+            
+            <a-form-item label="所属门店">
+              <span class="info-value">{{ employeeInfo.store?.name || '未分配' }}</span>
+            </a-form-item>
+            
+            <a-form-item label="入职时间">
+              <span class="info-value">{{ employeeInfo.hireDate || '无' }}</span>
+            </a-form-item>
+            
+            <a-form-item label="员工状态">
+              <a-tag :color="employeeInfo.status === '在职' ? 'green' : 'default'">
+                {{ employeeInfo.status || '无' }}
+              </a-tag>
+            </a-form-item>
+          </template>
 
-          <a-divider orientation="left">会员信息</a-divider>
+          <!-- 会员信息部分，仅对会员用户显示 -->
+          <template v-if="userInfo.role?.toUpperCase() === 'USER'">
+            <a-divider orientation="left">会员信息</a-divider>
 
-          <a-form-item label="会员编号">
-            <span class="info-value">{{ memberInfo.memberId || '无' }}</span>
-          </a-form-item>
+            <a-form-item label="会员编号">
+              <span class="info-value">{{ memberInfo.memberId || '无' }}</span>
+            </a-form-item>
 
-          <a-form-item label="会员等级">
-            <a-tag :color="getMemberLevelColor(memberInfo.memberLevel)">
-              {{ getMemberLevelText(memberInfo.memberLevel) || '无' }}
-            </a-tag>
-          </a-form-item>
+            <a-form-item label="会员等级">
+              <a-tag :color="getMemberLevelColor(memberInfo.memberLevel)">
+                {{ getMemberLevelText(memberInfo.memberLevel) || '无' }}
+              </a-tag>
+            </a-form-item>
 
-          <a-form-item label="当前积分">
-            <span class="info-value points">{{ memberInfo.points || 0 }}</span>
-          </a-form-item>
+            <a-form-item label="当前积分">
+              <span class="info-value points">{{ memberInfo.points || 0 }}</span>
+            </a-form-item>
 
-          <a-form-item label="累计消费">
-            <span class="info-value spending"
-              >¥{{ memberInfo.totalSpending ? memberInfo.totalSpending.toFixed(2) : '0.00' }}</span
-            >
-          </a-form-item>
+            <a-form-item label="累计消费">
+              <span class="info-value spending"
+                >¥{{ memberInfo.totalSpending ? memberInfo.totalSpending.toFixed(2) : '0.00' }}</span
+              >
+            </a-form-item>
 
-          <a-form-item label="注册时间">
-            <span class="info-value">{{
-              memberInfo.registrationTime ? formatDate(memberInfo.registrationTime) : '无'
-            }}</span>
-          </a-form-item>
+            <a-form-item label="注册时间">
+              <span class="info-value">{{
+                memberInfo.registrationTime ? formatDate(memberInfo.registrationTime) : '无'
+              }}</span>
+            </a-form-item>
 
-          <a-form-item label="账号状态">
-            <a-tag :color="memberInfo.status === '正常' ? 'success' : 'default'">
-              {{ memberInfo.status || '无' }}
-            </a-tag>
-          </a-form-item>
+            <a-form-item label="账号状态">
+              <a-tag :color="memberInfo.status === '正常' ? 'success' : 'default'">
+                {{ memberInfo.status || '无' }}
+              </a-tag>
+            </a-form-item>
+          </template>
         </a-form>
       </a-card>
     </div>
@@ -189,6 +213,20 @@ const memberInfo = ref({
   status: ''
 })
 
+// 员工信息
+const employeeInfo = ref({
+  code: '',
+  name: '',
+  phoneNumber: '',
+  email: '',
+  store: {
+    id: '',
+    name: ''
+  },
+  hireDate: '',
+  status: ''
+})
+
 // 表单数据
 const formData = reactive({
   name: '',
@@ -226,18 +264,13 @@ const passwordForm = reactive({
 
 // 密码验证规则
 const passwordRules = {
-  oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
+  oldPassword: [{ required: true, message: '请输入当前密码', trigger: 'change' }],
   newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 8, message: '密码长度至少8位', trigger: 'blur' },
-    {
-      pattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/,
-      message: '密码必须包含字母和数字',
-      trigger: 'blur'
-    }
+    { required: true, message: '请输入新密码', trigger: 'change' },
+    { min: 6, message: '密码长度至少6位', trigger: 'change' },
   ],
   confirmPassword: [
-    { required: true, message: '请确认新密码', trigger: 'blur' },
+    { required: true, message: '请确认新密码', trigger: 'change' },
     {
       validator: (rule, value) => {
         if (value !== passwordForm.newPassword) {
@@ -245,7 +278,7 @@ const passwordRules = {
         }
         return Promise.resolve()
       },
-      trigger: 'blur'
+      trigger: 'change'
     }
   ]
 }
@@ -277,7 +310,7 @@ const getRoleText = (role) => {
   const roleMap = {
     admin: '管理员',
     user: '普通用户',
-    staff: '员工'
+    employee: '员工'
   }
   return roleMap[role] || '未知角色'
 }
@@ -317,6 +350,15 @@ const fetchUserInfo = async () => {
 
     if (response.code === 200) {
       userInfo.value = response.data
+      
+      // 根据用户角色获取不同的信息
+      if (userInfo.value.role?.toUpperCase() === 'EMPLOYEE') {
+        fetchEmployeeInfo()
+      } else if (userInfo.value.role?.toUpperCase() === 'USER') {
+        fetchMemberInfo()
+      } else {
+        // 管理员或其他角色不需要额外获取信息
+      }
     }
   } catch (error) {
     console.error('获取用户信息失败:', error)
@@ -327,10 +369,10 @@ const fetchUserInfo = async () => {
 // 获取会员信息
 const fetchMemberInfo = async () => {
   try {
-    const response = await axios.get('/member/current')
+    const response = await axios.get('/member')
 
     if (response.code === 200) {
-      memberInfo.value = response.data
+      memberInfo.value = response.data.content?.[0]
 
       // 填充表单数据
       formData.name = memberInfo.value.name || ''
@@ -351,6 +393,26 @@ const fetchMemberInfo = async () => {
   }
 }
 
+// 获取员工信息
+const fetchEmployeeInfo = async () => {
+  try {
+    const response = await axios.get('/employee/current')
+
+    if (response.code === 200) {
+      employeeInfo.value = response.data
+
+      // 填充表单数据
+      formData.name = employeeInfo.value.name || ''
+      formData.phoneNumber = employeeInfo.value.phoneNumber || ''
+      formData.email = employeeInfo.value.email || ''
+      formData.gender = employeeInfo.value.gender || ''
+    }
+  } catch (error) {
+    console.error('获取员工信息失败:', error)
+    message.error('获取员工信息失败')
+  }
+}
+
 // 提交表单
 const handleSubmit = async () => {
   try {
@@ -365,15 +427,28 @@ const handleSubmit = async () => {
       birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null
     }
 
-    const response = await axios.put('/member/current', updateData)
+    let response
+    if (userInfo.value.role?.toUpperCase() === 'EMPLOYEE') {
+      response = await axios.put('/employee/current', updateData)
+    } else if (userInfo.value.role?.toUpperCase() === 'USER') {
+      response = await axios.put('/member/current', updateData)
+    } else {
+      throw new Error('不支持的用户角色')
+    }
 
     if (response.code === 200) {
-      message.success('会员信息更新成功')
-      fetchMemberInfo() // 重新获取会员信息
+      message.success(userInfo.value.role?.toUpperCase() === 'EMPLOYEE' ? '员工信息更新成功' : '会员信息更新成功')
+      
+      // 根据角色重新获取信息
+      if (userInfo.value.role?.toUpperCase() === 'EMPLOYEE') {
+        fetchEmployeeInfo()
+      } else if (userInfo.value.role?.toUpperCase() === 'USER') {
+        fetchMemberInfo()
+      }
     }
   } catch (error) {
-    console.error('更新会员信息失败:', error)
-    message.error(error.response?.data?.message || '更新会员信息失败')
+    console.error('更新信息失败:', error)
+    message.error(error.response?.data?.message || '更新信息失败')
   } finally {
     loading.value = false
   }
@@ -417,10 +492,9 @@ const handlePasswordChange = async () => {
   }
 }
 
-// 组件挂载时获取用户信息和会员信息
+// 组件挂载时获取用户信息
 onMounted(() => {
   fetchUserInfo()
-  fetchMemberInfo()
 })
 </script>
 

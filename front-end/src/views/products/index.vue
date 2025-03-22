@@ -14,22 +14,6 @@
               style="width: 300px"
             />
           </a-form-item>
-          <a-form-item>
-            <a-select
-              v-model:value="searchForm.category"
-              placeholder="药品分类"
-              style="width: 200px"
-              allowClear
-            >
-              <a-select-option v-for="cat in categories" :key="cat.value" :value="cat.value">
-                {{ cat.label }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item>
-            <a-button type="primary" @click="handleSearch">搜索</a-button>
-            <a-button style="margin-left: 8px" @click="resetSearch">重置</a-button>
-          </a-form-item>
         </a-form>
       </a-card>
     </div>
@@ -52,13 +36,19 @@
                     <span :class="getStockClass(product.quantity)">
                       {{ product.quantity || 0 }}
                     </span>
-                    <a-tag v-if="getStockStatus(product.quantity)" :color="getStockStatusColor(product.quantity)">
+                    <a-tag v-if="getStockStatus(product.quantity)" :color="getStockStatusColor(product.quantity)" >
                       {{ getStockStatus(product.quantity) }}
                     </a-tag>
                   </div>
                   <div class="description">{{ product.description }}</div>
                   <a-tag v-if="product.prescription" color="red">处方药</a-tag>
                   <a-tag v-else color="green">非处方药</a-tag>
+                  
+                  <!-- 添加评分展示 -->
+                  <div class="product-reviews" v-if="product.rating">
+                    <a-rate :value="product.rating" disabled allow-half :count="5" class="review-stars" />
+                    <span class="review-count">({{ product.reviewCount || 0 }})</span>
+                  </div>
                 </div>
               </template>
             </a-card-meta>
@@ -74,6 +64,11 @@
                 :disabled="!product.quantity"
               >
                 <ShoppingCartOutlined /> 加入购物车
+              </a-button>
+            </div>
+            <div class="card-footer">
+              <a-button type="link" block @click="showDetails(product)">
+                查看详情和评价
               </a-button>
             </div>
           </a-card>
@@ -97,6 +92,7 @@
       :title="selectedProduct?.name"
       width="700px"
       @cancel="closeDetails"
+      @ok="closeDetails"
     >
       <div class="product-detail" v-if="selectedProduct">
         <div class="detail-image">
@@ -126,6 +122,65 @@
           <p>{{ selectedProduct.precautions || '暂无信息' }}</p>
         </div>
       </div>
+      
+      <!-- 评价列表 -->
+      <a-divider orientation="left">
+        <span class="reviews-title">用户评价</span>
+        <a-badge :count="productReviews.length" :number-style="{ backgroundColor: '#52c41a' }" />
+      </a-divider>
+      
+      <div class="reviews-section">
+        <div v-if="productReviews.length === 0" class="empty-reviews">
+          <a-empty description="暂无评价" />
+        </div>
+        <div v-else class="reviews-list">
+          <a-list item-layout="horizontal" :data-source="productReviews">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-list-item-meta>
+                  <template #title>
+                    <div class="review-header">
+                      <a-rate :value="item.rating" disabled allow-half />
+                      <span class="review-time">{{ formatDate(item.createTime) }}</span>
+                    </div>
+                  </template>
+                  <template #description>
+                    <div class="review-content">{{ item.content }}</div>
+                  </template>
+                  <template #avatar>
+                    <a-avatar 
+                      :style="{ backgroundColor: getAvatarColor(item.userId) }"
+                    >
+                      {{ getUserInitial(item.username) }}
+                    </a-avatar>
+                  </template>
+                </a-list-item-meta>
+                
+                <div v-if="item.images" class="review-images">
+                  <a-image-preview-group>
+                    <a-image
+                      v-for="(img, index) in item.images.split(',')"
+                      :key="index"
+                      :width="80"
+                      :src="img"
+                    />
+                  </a-image-preview-group>
+                </div>
+              </a-list-item>
+            </template>
+          </a-list>
+          
+          <div class="reviews-pagination" v-if="productReviews.length > 5">
+            <a-pagination
+              v-model:current="reviewPagination.current"
+              :total="reviewPagination.total"
+              :pageSize="reviewPagination.pageSize"
+              size="small"
+              @change="handleReviewPageChange"
+            />
+          </div>
+        </div>
+      </div>
     </a-modal>
   </div>
 </template>
@@ -135,6 +190,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ShoppingCartOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import request from '@/utils/axios'
+import dayjs from 'dayjs'
 
 // 搜索表单
 const searchForm = reactive({
@@ -157,6 +213,13 @@ const pagination = reactive({
   total: 0
 })
 
+// 评价分页数据
+const reviewPagination = reactive({
+  current: 1,
+  pageSize: 5,
+  total: 0
+})
+
 // 药品数据
 const products = ref([])
 const loading = ref(false)
@@ -164,6 +227,29 @@ const loading = ref(false)
 // 详情弹窗
 const detailVisible = ref(false)
 const selectedProduct = ref(null)
+
+// 评价数据
+const productReviews = ref([])
+const reviewsLoading = ref(false)
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return '-'
+  return dayjs(dateStr).format('YYYY-MM-DD HH:mm')
+}
+
+// 获取用户头像颜色
+const getAvatarColor = (userId) => {
+  const colors = ['#f56a00', '#7265e6', '#ffbf00', '#00a2ae', '#87d068']
+  const index = userId ? (userId % colors.length) : 0
+  return colors[index]
+}
+
+// 获取用户名首字母
+const getUserInitial = (username) => {
+  if (!username) return '用'
+  return username.charAt(0).toUpperCase()
+}
 
 // 获取收藏列表
 const fetchFavorites = async () => {
@@ -205,10 +291,74 @@ const fetchProducts = async () => {
     
     // 获取收藏状态
     await fetchFavorites()
+    
+    // 获取各商品的评分统计
+    await fetchProductRatings()
   } catch (error) {
     message.error('获取药品列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 获取商品评分统计
+const fetchProductRatings = async () => {
+  try {
+    // 批量获取商品ID
+    const productIds = products.value.map(p => p.id)
+    if (productIds.length === 0) return
+    
+    const res = await request({
+      url: `/reviews/ratings`,
+      method: 'get',
+      params: {
+        productIds: productIds.join(',')
+      }
+    })
+    
+    if (res.code === 200 && res.data) {
+      // 更新商品评分信息
+      products.value = products.value.map(product => {
+        const ratingInfo = res.data.find(r => r.productId === product.id)
+        if (ratingInfo) {
+          return {
+            ...product,
+            rating: ratingInfo.averageRating,
+            reviewCount: ratingInfo.reviewCount
+          }
+        }
+        return product
+      })
+    }
+  } catch (error) {
+    console.error('获取商品评分失败:', error)
+    // 错误处理 - 静默失败，不影响主要功能
+  }
+}
+
+// 获取产品评价
+const fetchProductReviews = async (productId) => {
+  if (!productId) return
+  
+  reviewsLoading.value = true
+  try {
+    const res = await request({
+      url: `/reviews/product/${productId}`,
+      method: 'get',
+      params: {
+        page: reviewPagination.current - 1,
+        size: reviewPagination.pageSize
+      }
+    })
+    
+    if (res.code === 200) {
+      productReviews.value = res.data || []
+      reviewPagination.total = res.total || productReviews.value.length
+    }
+  } catch (error) {
+    console.error('获取产品评价失败:', error)
+  } finally {
+    reviewsLoading.value = false
   }
 }
 
@@ -282,12 +432,19 @@ const resetSearch = () => {
 const showDetails = (product) => {
   selectedProduct.value = product
   detailVisible.value = true
+  
+  // 重置评价分页
+  reviewPagination.current = 1
+  
+  // 加载产品评价
+  fetchProductReviews(product.id)
 }
 
 // 关闭详情
 const closeDetails = () => {
   detailVisible.value = false
   selectedProduct.value = null
+  productReviews.value = []
 }
 
 // 加入购物车
@@ -323,6 +480,12 @@ const handlePageChange = (page) => {
   fetchProducts()
 }
 
+// 处理评价分页
+const handleReviewPageChange = (page) => {
+  reviewPagination.current = page
+  fetchProductReviews(selectedProduct.value?.id)
+}
+
 // 初始化
 onMounted(() => {
   fetchProducts()
@@ -330,6 +493,9 @@ onMounted(() => {
 </script>
 
 <style lang="less" scoped>
+ .ant-tag {
+    margin-left: 10px;
+  }
 .products-container {
   padding: 16px;
   
@@ -340,10 +506,6 @@ onMounted(() => {
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(10px);
     }
-  }
-
-  .ant-tag {
-    margin-left: 10px;
   }
 
   .products-list {
@@ -402,6 +564,27 @@ onMounted(() => {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
         }
+        
+        .product-reviews {
+          margin-top: 12px;
+          display: flex;
+          align-items: center;
+          
+          .review-stars {
+            font-size: 14px;
+            line-height: 1;
+            
+            :deep(.ant-rate-star) {
+              margin-right: 2px;
+            }
+          }
+          
+          .review-count {
+            margin-left: 8px;
+            color: #8c8c8c;
+            font-size: 12px;
+          }
+        }
       }
 
       .card-actions {
@@ -419,6 +602,22 @@ onMounted(() => {
             &:hover {
               color: #1890ff;
             }
+          }
+        }
+      }
+      
+      .card-footer {
+        margin-top: 12px;
+        border-top: 1px solid #f0f0f0;
+        padding-top: 12px;
+        text-align: center;
+        
+        .ant-btn {
+          color: #1890ff;
+          
+          &:hover {
+            color: #40a9ff;
+            background: #f0f7ff;
           }
         }
       }
@@ -471,6 +670,53 @@ onMounted(() => {
       color: #52c41a;
       font-weight: bold;
     }
+  }
+}
+
+.reviews-section {
+  margin-top: 16px;
+  
+  .reviews-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #1890ff;
+  }
+  
+  .empty-reviews {
+    padding: 24px 0;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+  
+  .reviews-list {
+    .review-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      
+      .review-time {
+        color: #8c8c8c;
+        font-size: 12px;
+      }
+    }
+    
+    .review-content {
+      margin: 8px 0;
+      color: #262626;
+      white-space: pre-wrap;
+    }
+    
+    .review-images {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+  }
+  
+  .reviews-pagination {
+    text-align: center;
+    margin-top: 16px;
   }
 }
 

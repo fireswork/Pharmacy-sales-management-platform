@@ -42,6 +42,7 @@
         :row-key="record => record.id"
         bordered
         :loading="loading"
+        :scroll="{ x: 1000 }"
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -56,9 +57,6 @@
           <template v-if="column.key === 'action'">
             <a-space>
               <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" @click="handleViewPurchase(record)">采购记录</a-button>
-              <a-button type="link" size="small" @click="handleViewInventory(record)">库存查看</a-button>
-              <a-button type="link" size="small" @click="handleViewOrder(record)">订单记录</a-button>
               <a-button 
                 type="link" 
                 size="small" 
@@ -189,6 +187,7 @@
         :columns="orderColumns"
         :data-source="orderRecords"
         :pagination="{ pageSize: 5 }"
+        :scroll="{ x: 1000 }"
         bordered
       >
         <template #bodyCell="{ column, record }">
@@ -305,6 +304,7 @@ const columns = [
     title: '操作',
     key: 'action',
     width: 350,
+    fixed: 'right',
   }
 ]
 

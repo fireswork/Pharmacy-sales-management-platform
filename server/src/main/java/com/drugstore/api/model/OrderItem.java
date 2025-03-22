@@ -64,4 +64,13 @@ public class OrderItem {
     public void setPrice(BigDecimal price) {
         this.price = price;
     }
+
+    // 添加getUnitPrice方法，返回商品单价
+    public BigDecimal getUnitPrice() {
+        return this.price;
+    }
+
+    public void setUnitPrice(BigDecimal unitPrice) {
+        this.price = unitPrice;
+    }
 } 

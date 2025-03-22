@@ -19,7 +19,10 @@ public class Employee {
     
     private String phoneNumber;
     
+    @Column(nullable = false)
     private String email;
+    
+    private String gender; // 性别字段: male/female
     
     @ManyToOne
     @JoinColumn(name = "store_id")
@@ -74,6 +77,14 @@ public class Employee {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 
     public Store getStore() {

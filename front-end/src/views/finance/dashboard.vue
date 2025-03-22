@@ -8,6 +8,7 @@
           style="width: 160px"
           placeholder="选择店铺"
           allow-clear
+          @change="handleStoreChange"
         >
           <a-select-option v-for="store in storeOptions" :key="store.id" :value="store.id">
             {{ store.name }}
@@ -119,8 +120,10 @@
         :columns="columns"
         :data-source="salesList"
         :pagination="pagination"
+        :loading="loading"
         :row-key="record => record.id"
         bordered
+        @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'paymentMethod'">
@@ -138,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { message, Statistic } from 'ant-design-vue'
 import {
   SearchOutlined,
@@ -148,6 +151,11 @@ import {
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 import * as echarts from 'echarts'
+import axios from '@/utils/axios'
+
+// 门店列表
+const storeOptions = ref([])
+const loading = ref(false)
 
 // 搜索表单
 const searchForm = ref({
@@ -157,18 +165,33 @@ const searchForm = ref({
 
 // 统计数据
 const statistics = ref({
-  todaySales: 12580.50,
-  salesGrowth: 12.5,
-  todayOrders: 156,
-  ordersGrowth: -5.2,
-  averageOrder: 80.65,
-  grossProfitRate: 35.8
+  todaySales: 0,
+  salesGrowth: 0,
+  todayOrders: 0,
+  ordersGrowth: 0,
+  averageOrder: 0,
+  grossProfitRate: 0
+})
+
+// 分页配置
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+  showTotal: (total) => `共 ${total} 条`
 })
 
 // 图表实例
 const salesChart = ref(null)
 const paymentChart = ref(null)
 const productsChart = ref(null)
+let salesChartInstance = null
+let paymentChartInstance = null
+let productsChartInstance = null
+
+// 销售明细数据
+const salesList = ref([])
 
 // 表格列定义
 const columns = [
@@ -209,11 +232,139 @@ const columns = [
   }
 ]
 
+// 获取门店列表
+const fetchStores = async () => {
+  try {
+    const res = await axios.get('/store')
+    storeOptions.value = res.data.content || []
+  } catch (error) {
+    message.error('获取门店列表失败')
+  }
+}
+
+// 获取财务概览数据
+const fetchStatistics = async () => {
+  try {
+    const params = {}
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format('YYYY-MM-DD')
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format('YYYY-MM-DD')
+    }
+    
+    const res = await axios.get('/finance/statistics', { params })
+    if (res.code === 200) {
+      statistics.value = res.data
+    }
+  } catch (error) {
+    message.error('获取财务统计数据失败')
+  }
+}
+
+// 获取销售明细
+const fetchSalesList = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: pagination.current - 1,
+      size: pagination.pageSize
+    }
+    
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format('YYYY-MM-DD')
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format('YYYY-MM-DD')
+    }
+    
+    const res = await axios.get('/finance/sales', { params })
+    if (res.code === 200) {
+      salesList.value = res.data.content || []
+      pagination.total = res.data.totalElements || 0
+    }
+  } catch (error) {
+    message.error('获取销售明细失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取销售趋势数据
+const fetchSalesTrend = async () => {
+  try {
+    const params = {}
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format('YYYY-MM-DD')
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format('YYYY-MM-DD')
+    }
+    
+    const res = await axios.get('/finance/trend', { params })
+    if (res.code === 200) {
+      updateSalesChart(res.data)
+    }
+  } catch (error) {
+    message.error('获取销售趋势数据失败')
+  }
+}
+
+// 获取支付方式占比
+const fetchPaymentMethods = async () => {
+  try {
+    const params = {}
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format('YYYY-MM-DD')
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format('YYYY-MM-DD')
+    }
+    
+    const res = await axios.get('/finance/payment-methods', { params })
+    if (res.code === 200) {
+      updatePaymentChart(res.data)
+    }
+  } catch (error) {
+    message.error('获取支付方式数据失败')
+  }
+}
+
+// 获取热销商品
+const fetchHotProducts = async () => {
+  try {
+    const params = {}
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId
+    }
+    
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format('YYYY-MM-DD')
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format('YYYY-MM-DD')
+    }
+    
+    const res = await axios.get('/finance/hot-products', { params })
+    if (res.code === 200) {
+      updateProductsChart(res.data)
+    }
+  } catch (error) {
+    message.error('获取热销商品数据失败')
+  }
+}
+
 // 初始化图表
 const initCharts = () => {
   // 销售趋势图
-  const sales = echarts.init(salesChart.value)
-  sales.setOption({
+  salesChartInstance = echarts.init(salesChart.value)
+  salesChartInstance.setOption({
     tooltip: {
       trigger: 'axis'
     },
@@ -244,20 +395,20 @@ const initCharts = () => {
         name: '销售额',
         type: 'line',
         smooth: true,
-        data: [820, 932, 901, 934, 1290, 1330, 1520, 1200, 1100, 1400, 1800, 1380]
+        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       {
         name: '订单数',
         type: 'bar',
         yAxisIndex: 1,
-        data: [10, 12, 11, 14, 25, 30, 35, 28, 26, 32, 40, 30]
+        data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       }
     ]
   })
 
   // 支付方式占比
-  const payment = echarts.init(paymentChart.value)
-  payment.setOption({
+  paymentChartInstance = echarts.init(paymentChart.value)
+  paymentChartInstance.setOption({
     tooltip: {
       trigger: 'item',
       formatter: '{b}: {c} ({d}%)'
@@ -271,10 +422,10 @@ const initCharts = () => {
         type: 'pie',
         radius: '70%',
         data: [
-          { value: 1048, name: '微信支付' },
-          { value: 735, name: '支付宝' },
-          { value: 580, name: '现金' },
-          { value: 484, name: '银行卡' }
+          { value: 0, name: '微信支付' },
+          { value: 0, name: '支付宝' },
+          { value: 0, name: '现金' },
+          { value: 0, name: '银行卡' }
         ],
         emphasis: {
           itemStyle: {
@@ -288,8 +439,8 @@ const initCharts = () => {
   })
 
   // 热销商品TOP10
-  const products = echarts.init(productsChart.value)
-  products.setOption({
+  productsChartInstance = echarts.init(productsChart.value)
+  productsChartInstance.setOption({
     tooltip: {
       trigger: 'axis',
       axisPointer: {
@@ -301,22 +452,65 @@ const initCharts = () => {
     },
     yAxis: {
       type: 'category',
-      data: ['商品1', '商品2', '商品3', '商品4', '商品5', 
-             '商品6', '商品7', '商品8', '商品9', '商品10']
+      data: []
     },
     series: [
       {
         type: 'bar',
-        data: [320, 302, 301, 284, 250, 236, 210, 190, 180, 160]
+        data: []
       }
     ]
   })
 
   // 监听窗口大小变化
   window.addEventListener('resize', () => {
-    sales.resize()
-    payment.resize()
-    products.resize()
+    salesChartInstance.resize()
+    paymentChartInstance.resize()
+    productsChartInstance.resize()
+  })
+}
+
+// 更新销售趋势图
+const updateSalesChart = (data) => {
+  salesChartInstance.setOption({
+    xAxis: {
+      data: data.timeLabels || []
+    },
+    series: [
+      {
+        name: '销售额',
+        data: data.salesData || []
+      },
+      {
+        name: '订单数',
+        data: data.ordersData || []
+      }
+    ]
+  })
+}
+
+// 更新支付方式图
+const updatePaymentChart = (data) => {
+  paymentChartInstance.setOption({
+    series: [
+      {
+        data: data || []
+      }
+    ]
+  })
+}
+
+// 更新热销商品图
+const updateProductsChart = (data) => {
+  productsChartInstance.setOption({
+    yAxis: {
+      data: data.map(item => item.name) || []
+    },
+    series: [
+      {
+        data: data.map(item => item.sales) || []
+      }
+    ]
   })
 }
 
@@ -328,7 +522,7 @@ const getPaymentMethodText = (method) => {
     cash: '现金',
     card: '银行卡'
   }
-  return texts[method]
+  return texts[method] || method
 }
 
 // 日期限制
@@ -336,11 +530,25 @@ const disabledDate = (current) => {
   return current && current > dayjs().endOf('day')
 }
 
-// 处理函数
-const handleSearch = () => {
-  message.success('搜索成功')
+// 处理门店切换
+const handleStoreChange = () => {
+  handleSearch()
 }
 
+// 处理表格变化
+const handleTableChange = (pag) => {
+  pagination.current = pag.current
+  pagination.pageSize = pag.pageSize
+  fetchSalesList()
+}
+
+// 处理搜索
+const handleSearch = () => {
+  pagination.current = 1
+  fetchData()
+}
+
+// 重置搜索条件
 const handleReset = () => {
   searchForm.value = {
     storeId: undefined,
@@ -349,8 +557,19 @@ const handleReset = () => {
   handleSearch()
 }
 
+// 获取所有数据
+const fetchData = () => {
+  fetchStatistics()
+  fetchSalesList()
+  fetchSalesTrend()
+  fetchPaymentMethods()
+  fetchHotProducts()
+}
+
 onMounted(() => {
+  fetchStores()
   initCharts()
+  fetchData()
 })
 </script>
 

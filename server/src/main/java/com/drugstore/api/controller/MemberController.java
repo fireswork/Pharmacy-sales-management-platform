@@ -33,7 +33,7 @@ public class MemberController {
 
     // 获取所有会员（带分页、搜索和状态筛选）
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<UserInfoResponse>>> getAllMembers(
+    public ResponseEntity<ApiResponse<Page<MemberInfoResponse>>> getAllMembers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
@@ -61,11 +61,11 @@ public class MemberController {
             memberPage = memberRepository.findAll(pageable);
         }
         
-        // 转换为 UserInfoResponse 分页
-        Page<UserInfoResponse> userInfoPage = memberPage.map(member -> {
+        // 直接转换为 MemberInfoResponse 分页
+        Page<MemberInfoResponse> memberInfoPage = memberPage.map(member -> {
             User user = member.getUser();
             
-            MemberInfoResponse memberInfo = new MemberInfoResponse(
+            return new MemberInfoResponse(
                 member.getMemberId(),
                 member.getName(),
                 member.getPhoneNumber() != null ? member.getPhoneNumber() : "",
@@ -78,15 +78,9 @@ public class MemberController {
                 member.getRegistrationTime() != null ? member.getRegistrationTime().toString() : "",
                 member.getStatus()
             );
-            
-            return new UserInfoResponse(
-                user.getUsername(),
-                user.getRole(),
-                memberInfo
-            );
         });
         
-        return ResponseEntity.ok(new ApiResponse<>(userInfoPage, 200, "获取会员列表成功"));
+        return ResponseEntity.ok(new ApiResponse<>(memberInfoPage, 200, "获取会员列表成功"));
     }
 
     // 新增会员
@@ -285,6 +279,58 @@ public class MemberController {
         if (member == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiResponse<>(null, 404, "会员信息不存在"));
+        }
+        
+        // 更新会员信息
+        if (updateRequest.getName() != null) {
+            member.setName(updateRequest.getName());
+        }
+        if (updateRequest.getPhoneNumber() != null) {
+            member.setPhoneNumber(updateRequest.getPhoneNumber());
+        }
+        if (updateRequest.getEmail() != null) {
+            member.setEmail(updateRequest.getEmail());
+        }
+        if (updateRequest.getBirthday() != null) {
+            member.setBirthday(updateRequest.getBirthday());
+        }
+        if (updateRequest.getGender() != null) {
+            member.setGender(updateRequest.getGender());
+        }
+        
+        // 保存会员信息
+        Member savedMember = memberRepository.save(member);
+        
+        // 构建响应
+        MemberInfoResponse memberInfo = new MemberInfoResponse(
+            savedMember.getMemberId(),
+            savedMember.getName(),
+            savedMember.getPhoneNumber() != null ? savedMember.getPhoneNumber() : "",
+            savedMember.getEmail() != null ? savedMember.getEmail() : "",
+            savedMember.getBirthday() != null ? savedMember.getBirthday().toString() : "",
+            savedMember.getGender() != null ? savedMember.getGender() : "",
+            savedMember.getMemberLevel(),
+            savedMember.getPoints(),
+            savedMember.getTotalSpending(),
+            savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
+            savedMember.getStatus()
+        );
+        
+        return ResponseEntity.ok(new ApiResponse<>(memberInfo, 200, "会员信息更新成功"));
+    }
+
+    // 编辑会员信息
+    @PutMapping("/{memberId}")
+    public ResponseEntity<ApiResponse<MemberInfoResponse>> updateMember(
+            @PathVariable String memberId,
+            @RequestBody MemberUpdateRequest updateRequest) {
+        
+        // 查找会员
+        Member member = memberRepository.findByMemberId(memberId);
+        
+        if (member == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(null, 404, "会员不存在"));
         }
         
         // 更新会员信息

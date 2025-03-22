@@ -14,12 +14,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import com.drugstore.api.model.ApiResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/employee")
@@ -113,6 +117,7 @@ public class EmployeeController {
                 employee.getName(),
                 employee.getPhoneNumber() != null ? employee.getPhoneNumber() : "",
                 employee.getEmail() != null ? employee.getEmail() : "",
+                employee.getGender() != null ? employee.getGender() : "",
                 storeInfo,
                 employee.getHireDate() != null ? employee.getHireDate().toString() : "",
                 employee.getStatus()
@@ -132,23 +137,23 @@ public class EmployeeController {
 
     // 获取所有门店（只返回营业中的门店）
     @GetMapping("/stores")
-    public ResponseEntity<ApiResponse<List<StoreInfoResponse>>> getAllStores() {
-        List<Store> stores = storeRepository.findByStatus("active");
-        
-        List<StoreInfoResponse> storeInfoList = stores.stream()
-            .map(store -> new StoreInfoResponse(
-                store.getId(),
-                store.getCode(),
-                store.getName(),
-                store.getAddress() != null ? store.getAddress() : "",
-                store.getPhoneNumber() != null ? store.getPhoneNumber() : "",
-                store.getOpenTime() != null ? store.getOpenTime() : "",
-                store.getCloseTime() != null ? store.getCloseTime() : "",
-                store.getStatus()
-            ))
-            .collect(Collectors.toList());
-        
-        return ResponseEntity.ok(new ApiResponse<>(storeInfoList, 200, "获取门店列表成功"));
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getStoreList() {
+        try {
+            List<Store> stores = storeRepository.findAll();
+            List<Map<String, Object>> storeList = new ArrayList<>();
+            
+            for (Store store : stores) {
+                Map<String, Object> storeMap = new HashMap<>();
+                storeMap.put("id", store.getId());
+                storeMap.put("name", store.getName());
+                storeList.add(storeMap);
+            }
+            
+            return ResponseEntity.ok(new ApiResponse<>(storeList, 200, "获取门店列表成功"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ApiResponse<>(null, 500, "获取门店列表失败: " + e.getMessage()));
+        }
     }
 
     // 添加员工
@@ -214,6 +219,7 @@ public class EmployeeController {
                 savedEmployee.getName(),
                 savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
                 savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
+                savedEmployee.getGender() != null ? savedEmployee.getGender() : "",
                 storeInfo,
                 savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
                 savedEmployee.getStatus()
@@ -288,6 +294,7 @@ public class EmployeeController {
             savedEmployee.getName(),
             savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
             savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
+            savedEmployee.getGender() != null ? savedEmployee.getGender() : "",
             storeInfo,
             savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
             savedEmployee.getStatus()
@@ -348,6 +355,9 @@ public class EmployeeController {
         if (employeeRequest.getEmail() != null) {
             employee.setEmail(employeeRequest.getEmail());
         }
+        if (employeeRequest.getGender() != null) {
+            employee.setGender(employeeRequest.getGender());
+        }
         if (employeeRequest.getHireDate() != null) {
             employee.setHireDate(employeeRequest.getHireDate());
         }
@@ -385,11 +395,147 @@ public class EmployeeController {
             savedEmployee.getName(),
             savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
             savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
+            savedEmployee.getGender() != null ? savedEmployee.getGender() : "",
             storeInfo,
             savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
             savedEmployee.getStatus()
         );
         
         return ResponseEntity.ok(new ApiResponse<>(employeeInfo, 200, "员工信息更新成功"));
+    }
+
+    // 获取当前登录员工信息
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse<EmployeeInfoResponse>> getCurrentEmployee() {
+        try {
+            // 获取当前登录用户
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // 查找用户
+            User user = userRepository.findByUsername(username);
+            
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(null, 404, "用户不存在"));
+            }
+            
+            // 查找关联的员工信息
+            Employee employee = employeeRepository.findByUser(user);
+            
+            if (employee == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(null, 404, "员工信息不存在"));
+            }
+            
+            // 构建响应
+            StoreInfoResponse storeInfo = null;
+            if (employee.getStore() != null) {
+                Store store = employee.getStore();
+                storeInfo = new StoreInfoResponse(
+                    store.getId(),
+                    store.getCode(),
+                    store.getName(),
+                    store.getAddress() != null ? store.getAddress() : "",
+                    store.getPhoneNumber() != null ? store.getPhoneNumber() : "",
+                    store.getOpenTime() != null ? store.getOpenTime() : "",
+                    store.getCloseTime() != null ? store.getCloseTime() : "",
+                    store.getStatus()
+                );
+            }
+            
+            EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
+                employee.getId(),
+                employee.getCode(),
+                employee.getName(),
+                employee.getPhoneNumber() != null ? employee.getPhoneNumber() : "",
+                employee.getEmail() != null ? employee.getEmail() : "",
+                employee.getGender() != null ? employee.getGender() : "",
+                storeInfo,
+                employee.getHireDate() != null ? employee.getHireDate().toString() : "",
+                employee.getStatus()
+            );
+            
+            return ResponseEntity.ok(new ApiResponse<>(employeeInfo, 200, "获取当前员工信息成功"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse<>(null, 500, "获取当前员工信息失败: " + e.getMessage()));
+        }
+    }
+
+    // 更新当前登录员工信息
+    @PutMapping("/current")
+    public ResponseEntity<ApiResponse<EmployeeInfoResponse>> updateCurrentEmployee(@RequestBody EmployeeRequest employeeRequest) {
+        try {
+            // 获取当前登录用户
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // 查找用户
+            User user = userRepository.findByUsername(username);
+            
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(null, 404, "用户不存在"));
+            }
+            
+            // 查找关联的员工信息
+            Employee employee = employeeRepository.findByUser(user);
+            
+            if (employee == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(null, 404, "员工信息不存在"));
+            }
+            
+            // 更新员工信息
+            if (employeeRequest.getName() != null) {
+                employee.setName(employeeRequest.getName());
+            }
+            if (employeeRequest.getPhoneNumber() != null) {
+                employee.setPhoneNumber(employeeRequest.getPhoneNumber());
+            }
+            if (employeeRequest.getEmail() != null) {
+                employee.setEmail(employeeRequest.getEmail());
+            }
+            if (employeeRequest.getGender() != null) {
+                employee.setGender(employeeRequest.getGender());
+            }
+            
+            // 保存员工信息
+            Employee savedEmployee = employeeRepository.save(employee);
+            
+            // 构建响应
+            StoreInfoResponse storeInfo = null;
+            if (savedEmployee.getStore() != null) {
+                Store store = savedEmployee.getStore();
+                storeInfo = new StoreInfoResponse(
+                    store.getId(),
+                    store.getCode(),
+                    store.getName(),
+                    store.getAddress() != null ? store.getAddress() : "",
+                    store.getPhoneNumber() != null ? store.getPhoneNumber() : "",
+                    store.getOpenTime() != null ? store.getOpenTime() : "",
+                    store.getCloseTime() != null ? store.getCloseTime() : "",
+                    store.getStatus()
+                );
+            }
+            
+            EmployeeInfoResponse employeeInfo = new EmployeeInfoResponse(
+                savedEmployee.getId(),
+                savedEmployee.getCode(),
+                savedEmployee.getName(),
+                savedEmployee.getPhoneNumber() != null ? savedEmployee.getPhoneNumber() : "",
+                savedEmployee.getEmail() != null ? savedEmployee.getEmail() : "",
+                savedEmployee.getGender() != null ? savedEmployee.getGender() : "",
+                storeInfo,
+                savedEmployee.getHireDate() != null ? savedEmployee.getHireDate().toString() : "",
+                savedEmployee.getStatus()
+            );
+            
+            return ResponseEntity.ok(new ApiResponse<>(employeeInfo, 200, "员工信息更新成功"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse<>(null, 500, "更新员工信息失败: " + e.getMessage()));
+        }
     }
 } 

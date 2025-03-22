@@ -42,6 +42,7 @@
         :pagination="pagination"
         :loading="loading"
         :row-key="record => record.id"
+        :scroll="{ x: 1200 }"
         @change="handleTableChange"
         bordered
       >
@@ -62,6 +63,7 @@
                 size="small" 
                 :danger="record.status === 'active'"
                 @click="handleStatusChange(record)"
+                v-if="userRole === 'ADMIN'"
               >
                 {{ record.status === 'active' ? '停用' : '启用' }}
               </a-button>
@@ -160,6 +162,8 @@ const searchForm = ref({
 const supplierList = ref([])
 const loading = ref(false)
 
+// 权限
+const userRole = ref(localStorage.getItem('userRole'))
 // 分页配置
 const pagination = ref({
   current: 1,
@@ -263,7 +267,8 @@ const handleEdit = (record) => {
     address: record.address,
     businessScope: record.businessScope,
     status: record.status,
-    remark: record.remark
+    remark: record.remark,
+    code: record.code
   }
   modalVisible.value = true
 }
@@ -337,6 +342,7 @@ const columns = [
     title: '邮箱地址',
     dataIndex: 'email',
     width: 200,
+    customRender: ({text}) => text || '-'
   },
   {
     title: '地址',

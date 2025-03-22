@@ -7,6 +7,7 @@ public class EmployeeRequest {
     private String name;
     private String phoneNumber;
     private String email;
+    private String gender;
     private Long storeId;
     private Date hireDate;
 
@@ -41,6 +42,14 @@ public class EmployeeRequest {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 
     public Long getStoreId() {

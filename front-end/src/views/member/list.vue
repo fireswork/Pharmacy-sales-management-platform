@@ -19,16 +19,6 @@
             <a-select-option value="正常">正常</a-select-option>
             <a-select-option value="已停用">已停用</a-select-option>
           </a-select>
-          <a-select
-            v-model:value="searchForm.storeId"
-            style="width: 180px"
-            placeholder="所属门店"
-            allow-clear
-          >
-            <a-select-option v-for="store in storeOptions" :key="store.id" :value="store.id">
-              {{ store.name }}
-            </a-select-option>
-          </a-select>
           <a-button type="primary" @click="handleSearch">
             <template #icon><SearchOutlined /></template>
             查询
@@ -53,19 +43,20 @@
         :row-key="record => record.username"
         bordered
         @change="handleTableChange"
+        :scroll="{ x: 1300 }"
       >
         <template #bodyCell="{ column, record }">
           <!-- 会员等级列 -->
           <template v-if="column.key === 'memberLevel'">
-            <a-tag :color="getMemberLevelColor(record.member.memberLevel)">
-              {{ getMemberLevelText(record.member.memberLevel) }}
+            <a-tag :color="getMemberLevelColor(record.memberLevel)">
+              {{ getMemberLevelText(record.memberLevel) }}
             </a-tag>
           </template>
 
           <!-- 状态列 -->
           <template v-if="column.key === 'status'">
-            <a-tag :color="record.member.status === '正常' ? 'success' : 'default'">
-              {{ record.member.status }}
+            <a-tag :color="record.status === '正常' ? 'success' : 'default'">
+              {{ record.status }}
             </a-tag>
           </template>
           
@@ -75,10 +66,17 @@
               <a-button 
                 type="link" 
                 size="small" 
-                :danger="record.member.status === '正常'"
+                @click="handleEdit(record)"
+              >
+                编辑
+              </a-button>
+              <a-button 
+                type="link" 
+                size="small" 
+                :danger="record.status === '正常'"
                 @click="handleStatusChange(record)"
               >
-                {{ record.member.status === '正常' ? '停用' : '启用' }}
+                {{ record.status === '正常' ? '停用' : '启用' }}
               </a-button>
             </a-space>
           </template>
@@ -89,12 +87,12 @@
     <!-- 新增/编辑弹窗 -->
     <a-modal
       v-model:visible="modalVisible"
-      :title="isEdit ? '编辑会员' : '新增会员'"
+      :title="isEdit ? '编辑会员信息' : '新增会员'"
       @ok="handleModalSubmit"
       :confirmLoading="submitLoading"
       width="680px"
       :maskClosable="false"
-      okText="确定"
+      :okText="isEdit ? '保存' : '确定'"
       cancelText="取消"
     >
       <a-form
@@ -104,6 +102,13 @@
         :label-col="{ span: 6 }"
         :wrapper-col="{ span: 16 }"
       >
+        <a-form-item 
+          label="会员编号" 
+          v-if="isEdit"
+        >
+          <span>{{ formData.memberId }}</span>
+        </a-form-item>
+        
         <a-form-item label="会员姓名" name="username" required>
           <a-input v-model:value="formData.username" placeholder="请输入会员姓名" />
         </a-form-item>
@@ -130,6 +135,22 @@
             <a-radio value="female">女</a-radio>
           </a-radio-group>
         </a-form-item>
+        
+        <template v-if="isEdit">
+          <a-form-item label="会员等级">
+            <a-tag :color="getMemberLevelColor(formData.memberLevel)">
+              {{ getMemberLevelText(formData.memberLevel) }}
+            </a-tag>
+          </a-form-item>
+          
+          <a-form-item label="当前积分">
+            <span>{{ formData.points }}</span>
+          </a-form-item>
+          
+          <a-form-item label="累计消费">
+            <span>¥{{ formData.totalSpending ? formData.totalSpending.toFixed(2) : '0.00' }}</span>
+          </a-form-item>
+        </template>
       </a-form>
     </a-modal>
 
@@ -227,27 +248,29 @@ const memberLevels = [
 const columns = [
   {
     title: '会员编号',
-    dataIndex: ['member', 'memberId'],
+    dataIndex: ['memberId'],
     width: 120,
   },
   {
     title: '会员姓名',
-    dataIndex: ['member', 'name'],
-    width: 120,
+    dataIndex: ['name'],
+    width: 140,
   },
   {
     title: '手机号',
-    dataIndex: ['member', 'phoneNumber'],
+    dataIndex: ['phoneNumber'],
     width: 150,
+    customRender: ({ text }) => text || '-'
   },
   {
     title: '邮箱',
-    dataIndex: ['member', 'email'],
+    dataIndex: ['email'],
     width: 180,
+    customRender: ({text}) => text || '-'
   },
   {
     title: '性别',
-    dataIndex: ['member', 'gender'],
+    dataIndex: ['gender'],
     width: 80,
     customRender: ({ text }) => {
       if (text === 'male') return '男'
@@ -257,18 +280,18 @@ const columns = [
   },
   {
     title: '会员等级',
-    dataIndex: ['member', 'memberLevel'],
+    dataIndex: ['memberLevel'],
     key: 'memberLevel',
     width: 120,
   },
   {
     title: '当前积分',
-    dataIndex: ['member', 'points'],
-    width: 120,
+    dataIndex: ['points'],
+    width: 150,
   },
   {
     title: '累计消费',
-    dataIndex: ['member', 'totalSpending'],
+    dataIndex: ['totalSpending'],
     width: 120,
     customRender: ({ text }) => {
       return text ? `¥${text.toFixed(2)}` : '¥0.00'
@@ -276,7 +299,7 @@ const columns = [
   },
   {
     title: '注册时间',
-    dataIndex: ['member', 'registrationTime'],
+    dataIndex: ['registrationTime'],
     width: 200,
     customRender: ({ text }) => {
       return text ? dayjs(text).format('YYYY-MM-DD HH:mm') : '无'
@@ -284,7 +307,7 @@ const columns = [
   },
   {
     title: '状态',
-    dataIndex: ['member', 'status'],
+    dataIndex: ['status'],
     key: 'status',
     width: 100,
   },
@@ -528,54 +551,82 @@ const handleAdd = () => {
 }
 
 const handleEdit = (record) => {
-  isEdit.value = true
+  isEdit.value = true;
+  currentMember.value = record.member;
+  
+  // 设置表单数据
   formData.value = {
-    username: record.member.name,
-    phoneNumber: record.member.phoneNumber || '',
-    memberLevel: record.member.memberLevel || 'bronze',
-    birthday: record.member.birthday ? dayjs(record.member.birthday) : null,
-    email: record.member.email || '',
-    gender: record.member.gender || ''
-  }
-  modalVisible.value = true
-}
+    id: record.id,
+    memberId: record.memberId,
+    username: record.name,
+    name: record.name,
+    phoneNumber: record.phoneNumber || '',
+    birthday: record.birthday ? dayjs(record.birthday) : null,
+    email: record.email || '',
+    gender: record.gender || '',
+    // 保留现有值，不允许管理员直接修改
+    memberLevel: record.memberLevel,
+    points: record.points,
+    totalSpending: record.totalSpending
+  };
+  
+  modalVisible.value = true;
+};
 
 const handleModalSubmit = async () => {
   try {
-    await formRef.value.validate()
-    submitLoading.value = true
+    await formRef.value.validate();
+    submitLoading.value = true;
     
-    const newMember = {
-      username: formData.value.username,
-      name: formData.value.name || formData.value.username,
+    // 构建提交的数据对象
+    const memberData = {
+      name: formData.value.username,
       phoneNumber: formData.value.phoneNumber,
       email: formData.value.email,
       gender: formData.value.gender,
-      birthday: formData.value.birthday ? formData.value.birthday.format('YYYY-MM-DD') : null,
-    }
+      birthday: formData.value.birthday ? formData.value.birthday.toDate() : null,
+    };
     
-    const response = await axios.post('/member', newMember)
+    let response;
     
-    if (response.code === 201) {
-      message.success('会员添加成功')
-      modalVisible.value = false
-      fetchMembers()
-      resetForm()
+    if (isEdit.value) {
+      // 更新会员
+      response = await axios.put(`/member/${formData.value.memberId}`, memberData);
+      
+      if (response.code === 200) {
+        message.success('会员信息更新成功');
+        modalVisible.value = false;
+        fetchMembers();
+      }
+    } else {
+      // 添加新会员
+      const newMember = {
+        username: formData.value.username,
+        ...memberData
+      };
+      
+      response = await axios.post('/member', newMember);
+      
+      if (response.code === 201) {
+        message.success('会员添加成功');
+        modalVisible.value = false;
+        fetchMembers();
+      }
     }
   } catch (error) {
-    console.error('添加会员失败:', error)
-    message.error(error.response?.data?.message || '添加会员失败')
+    console.error(isEdit.value ? '更新会员失败:' : '添加会员失败:', error);
+    message.error(error.response?.data?.message || (isEdit.value ? '更新会员失败' : '添加会员失败'));
   } finally {
-    submitLoading.value = false
+    submitLoading.value = false;
   }
-}
+};
 
 const handleStatusChange = async (record) => {
-  const newStatus = record.member.status === '正常' ? '已停用' : '正常'
+  const newStatus = record.status === '正常' ? '已停用' : '正常'
   const action = newStatus === '正常' ? '启用' : '停用'
   
   try {
-    const response = await axios.put(`/member/${record.member.memberId}/status?status=${newStatus}`)
+    const response = await axios.put(`/member/${record.memberId}/status?status=${newStatus}`)
     
     if (response.code === 200) {
       message.success(`${action}成功`)
@@ -640,6 +691,22 @@ const handleViewOrders = (record) => {
   
   ordersVisible.value = true
 }
+
+// 重置表单
+const resetForm = () => {
+  formData.value = {
+    username: '',
+    phoneNumber: '',
+    memberLevel: 'bronze',
+    birthday: null,
+    email: '',
+    gender: ''
+  };
+  
+  if (formRef.value) {
+    formRef.value.resetFields();
+  }
+};
 
 // 组件挂载时获取会员列表
 onMounted(() => {

@@ -17,6 +17,7 @@ public class ProductRequest {
     private String usage;
     private String status;
     private Integer stock;
+    private Long storeId;
     
     // Getters and Setters
     public String getName() {
@@ -129,5 +130,13 @@ public class ProductRequest {
     
     public void setStock(Integer stock) {
         this.stock = stock;
+    }
+    
+    public Long getStoreId() {
+        return storeId;
+    }
+    
+    public void setStoreId(Long storeId) {
+        this.storeId = storeId;
     }
 } 

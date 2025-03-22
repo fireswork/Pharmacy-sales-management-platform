@@ -33,6 +33,21 @@
             <a-select-option value="active">上架中</a-select-option>
             <a-select-option value="inactive">已下架</a-select-option>
           </a-select>
+          <!-- 管理员可以选择门店，使用计算属性判断 -->
+          <a-select
+            v-if="isAdminUser"
+            v-model:value="searchForm.storeId"
+            style="width: 150px"
+            placeholder="选择门店"
+          >
+            <a-select-option
+              v-for="store in storeOptions"
+              :key="store.id"
+              :value="store.id"
+            >
+              {{ store.name }}
+            </a-select-option>
+          </a-select>
           <a-button type="primary" @click="handleSearch">
             <template #icon><SearchOutlined /></template>
             查询
@@ -55,6 +70,7 @@
         :pagination="pagination"
         :loading="loading"
         :row-key="(record) => record.id"
+        :scroll="{ x: 1000 }"
         @change="handleTableChange"
         bordered
         class="product-table"
@@ -92,31 +108,27 @@
     <a-modal
       v-model:visible="modalVisible"
       :title="isEdit ? '编辑药品' : '新增药品'"
+      width="600px"
       @ok="handleModalSubmit"
-      :confirmLoading="submitLoading"
-      width="700px"
-      :maskClosable="false"
-      okText="确定"
-      cancelText="取消"
+      @cancel="modalVisible = false"
+      :confirm-loading="submitLoading"
     >
       <a-form
         ref="formRef"
         :model="formData"
         :rules="rules"
-        :label-col="{ span: 4 }"
-        :wrapper-col="{ span: 18 }"
+        :label-col="{ span: 5 }"
+        :wrapper-col="{ span: 19 }"
       >
-        <a-form-item label="药品名称" name="name" required>
+        <a-form-item label="药品名称" name="name">
           <a-input v-model:value="formData.name" placeholder="请输入药品名称" />
         </a-form-item>
-
-        <a-form-item v-if="isEdit" label="药品编号">
-          <a-input v-model:value="formData.code" disabled />
-          <div class="form-item-tip">药品编号系统自动生成，不可修改</div>
-        </a-form-item>
-
-        <a-form-item label="药品分类" name="category" required>
-          <a-select v-model:value="formData.category" placeholder="请选择药品分类">
+        <a-form-item label="药品分类" name="category">
+          <a-select
+            v-model:value="formData.category"
+            placeholder="请选择药品分类"
+            allow-clear
+          >
             <a-select-option
               v-for="category in categoryOptions"
               :key="category.value"
@@ -126,9 +138,25 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-
+        <!-- 管理员可以选择门店，使用计算属性判断 -->
+        <a-form-item v-if="isAdminUser" label="所属门店" name="storeId">
+          <a-select
+            v-model:value="formData.storeId"
+            placeholder="请选择所属门店"
+            allow-clear
+            :disabled="isEdit"
+          >
+            <a-select-option
+              v-for="store in storeOptions"
+              :key="store.id"
+              :value="store.id"
+            >
+              {{ store.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="规格" name="specification">
-          <a-input v-model:value="formData.specification" placeholder="请输入药品规格" />
+          <a-input v-model:value="formData.specification" placeholder="请输入规格" />
         </a-form-item>
 
         <a-form-item label="生产厂家" name="manufacturer">
@@ -207,16 +235,25 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import axios from '../../utils/axios'
+
+// 是否管理员
+const isAdmin = ref(false)
+
+// 从localStorage获取用户角色判断是否为管理员
+const isAdminUser = computed(() => {
+  return localStorage.getItem('userRole')?.toUpperCase() === 'ADMIN'
+})
 
 // 搜索表单
 const searchForm = ref({
   keyword: '',
   category: undefined,
-  status: undefined
+  status: undefined,
+  storeId: undefined
 })
 
 // 药品列表
@@ -259,7 +296,8 @@ const formData = ref({
   image: '',
   description: '',
   usage: '',
-  status: 'active'
+  status: 'active',
+  storeId: null
 })
 
 // 图片上传相关
@@ -274,6 +312,9 @@ const categoryOptions = [
   { label: '保健品', value: 'health' },
   { label: '医疗器械', value: 'device' }
 ]
+
+// 门店列表
+const storeOptions = ref([])
 
 // 表格列定义
 const columns = [
@@ -300,7 +341,7 @@ const columns = [
     dataIndex: 'category',
     key: 'category',
     width: 100,
-    render: (text) => {
+    customRender: ({text}) => {
       const category = categoryOptions.find(item => item.value === text)
       return category ? category.label : text
     }
@@ -316,7 +357,7 @@ const columns = [
     dataIndex: 'retailPrice',
     key: 'retailPrice',
     width: 100,
-    render: (text) => (text ? `¥${text}` : '-')
+    customRender: ({text}) => (text ? `¥${text}` : '-')
   },
   {
     title: '库存',
@@ -339,6 +380,39 @@ const columns = [
   }
 ]
 
+// 获取用户信息
+const fetchUserInfo = async () => {
+  try {
+    const response = await axios.get('/user')
+    if (response && response.code === 200) {
+      isAdmin.value = response.data.role?.toUpperCase() === 'ADMIN'
+      
+      // 如果是管理员，加载门店列表
+      if (isAdmin.value) {
+        fetchStoreList()
+      }
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+}
+
+// 获取门店列表
+const fetchStoreList = async () => {
+  try {
+    const response = await axios.get('/employee/stores')
+    if (response && response.code === 200) {
+      storeOptions.value = response.data || []
+      // 管理员默认选中第一个门店
+      if (isAdminUser.value && storeOptions.value.length > 0 && !searchForm.value.storeId) {
+        searchForm.value.storeId = storeOptions.value[0].id
+      }
+    }
+  } catch (error) {
+    console.error('获取门店列表失败:', error)
+  }
+}
+
 // 获取药品列表
 const fetchProducts = async (params = {}) => {
   try {
@@ -353,7 +427,7 @@ const fetchProducts = async (params = {}) => {
       order: 'desc'
     }
     
-    // 添加筛选条件 - 修复：直接使用 searchForm 的值
+    // 添加筛选条件
     if (searchForm.value.keyword?.trim()) {
       queryParams.keyword = searchForm.value.keyword.trim()
     }
@@ -361,24 +435,80 @@ const fetchProducts = async (params = {}) => {
       queryParams.category = searchForm.value.category
     }
     if (searchForm.value.status) {
-      queryParams.status = searchForm.value.status
+      queryParams.drugStatus = searchForm.value.status
     }
-
-    const response = await axios.get('/products', { 
-      params: queryParams,
-      // 确保正确处理参数
-      paramsSerializer: params => {
-        return Object.entries(params)
-          .filter(([_, value]) => value != null)
-          .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-          .join('&')
-      }
-    })
     
-    if (response.code === 200) {
-      productList.value = response.data.content
-      pagination.value.total = response.data.totalElements
-      pagination.value.current = page + 1
+    // 管理员和员工的处理方式
+    if (isAdminUser.value) {
+      // 管理员必须选择门店查询
+      if (!searchForm.value.storeId && storeOptions.value.length > 0) {
+        searchForm.value.storeId = storeOptions.value[0].id
+      }
+      
+      // 确保有门店ID
+      if (!searchForm.value.storeId) {
+        loading.value = false
+        return // 如果没有门店ID，不执行查询
+      }
+      
+      const response = await axios.get(`/inventory/store/${searchForm.value.storeId}`, { 
+        params: queryParams,
+        paramsSerializer: params => {
+          return Object.entries(params)
+            .filter(([_, value]) => value != null)
+            .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+            .join('&')
+        }
+      })
+      
+      if (response.code === 200) {
+        productList.value = response.data.content.map(item => ({
+          id: item.productId,
+          name: item.productName,
+          code: item.productCode,
+          category: item.category,
+          specification: item.specification,
+          manufacturer: item.manufacturer,
+          retailPrice: item.price,
+          stock: item.quantity,
+          image: item.image,
+          description: item.description,
+          status: item.drugStatus || 'active',
+          storeId: item.storeId
+        }))
+        pagination.value.total = response.data.totalElements
+        pagination.value.current = page + 1
+      }
+    } else {
+      // 员工从库存接口获取自己门店的药品
+      const response = await axios.get('/inventory/current', { 
+        params: queryParams,
+        paramsSerializer: params => {
+          return Object.entries(params)
+            .filter(([_, value]) => value != null)
+            .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+            .join('&')
+        }
+      })
+      
+      if (response.code === 200) {
+        productList.value = response.data.content.map(item => ({
+          id: item.productId,
+          name: item.productName,
+          code: item.productCode,
+          category: item.category,
+          specification: item.specification,
+          manufacturer: item.manufacturer,
+          retailPrice: item.price,
+          stock: item.quantity,
+          image: item.image,
+          description: item.description,
+          status: item.drugStatus || 'active',
+          storeId: item.storeId
+        }))
+        pagination.value.total = response.data.totalElements
+        pagination.value.current = page + 1
+      }
     }
   } catch (error) {
     console.error('获取药品列表失败:', error)
@@ -409,11 +539,16 @@ const handleSearch = () => {
 
 // 处理重置
 const handleReset = () => {
+  // 保存当前选中的门店ID
+  const currentStoreId = searchForm.value.storeId
+  
   searchForm.value = {
     keyword: '',
     category: undefined,
-    status: undefined
+    status: undefined,
+    storeId: currentStoreId // 保留门店选择不重置
   }
+  
   pagination.value.current = 1
   fetchProducts({
     page: 0,
@@ -438,8 +573,19 @@ const handleAdd = () => {
     image: '',
     description: '',
     usage: '',
-    status: 'active'
+    status: 'active',
+    storeId: null
   }
+  
+  // 如果是管理员，可以选择门店并默认选中第一个
+  if (isAdminUser.value) {
+    fetchStoreList().then(() => {
+      if (storeOptions.value.length > 0) {
+        formData.value.storeId = storeOptions.value[0].id
+      }
+    })
+  }
+
   fileList.value = []
   imageUrl.value = ''
   modalVisible.value = true
@@ -448,7 +594,11 @@ const handleAdd = () => {
 // 处理编辑
 const handleEdit = (record) => {
   isEdit.value = true
-  formData.value = { ...record }
+  formData.value = { 
+    ...record,
+    // 如果是管理员编辑，需要确保storeId存在
+    storeId: record.storeId || (isAdminUser.value && storeOptions.value.length > 0 ? storeOptions.value[0].id : null)
+  }
 
   if (record.image) {
     imageUrl.value = record.image
@@ -474,7 +624,14 @@ const handleToggleStatus = async (record) => {
     toggleLoading.value = true
     const newStatus = record.status === 'active' ? 'inactive' : 'active'
 
-    await axios.put(`/products/${record.id}/status`, { status: newStatus })
+    // 更新库存商品状态
+    const requestData = {
+      storeId: record.storeId,
+      productId: record.id,
+      drugStatus: newStatus
+    }
+
+    await axios.put(`/inventory/status`, requestData)
 
     message.success(`${newStatus === 'active' ? '上架' : '下架'}成功`)
     fetchProducts()
@@ -541,27 +698,47 @@ const handleModalSubmit = async () => {
     await formRef.value.validate()
     submitLoading.value = true
 
-    const requestData = {
-      name: formData.value.name,
-      category: formData.value.category,
-      specification: formData.value.specification,
-      manufacturer: formData.value.manufacturer,
-      approvalNumber: formData.value.approvalNumber,
-      retailPrice: formData.value.retailPrice,
-      costPrice: formData.value.costPrice,
-      stock: formData.value.stock,
-      image: imageUrl.value, // 使用本地预览URL（base64数据）
-      description: formData.value.description,
-      usage: formData.value.usage,
-      status: formData.value.status
-    }
-    
-    // 注意这里不包含 code 字段，因为它是自增的
-
+    // 区分新增和编辑
     if (isEdit.value) {
-      await axios.put(`/products/${formData.value.id}`, requestData)
-      message.success('药品信息更新成功')
+      // 编辑操作 - 更新库存
+      const requestData = {
+        storeId: isAdminUser.value ? formData.value.storeId : null, // 管理员可以选择门店
+        productId: formData.value.id,
+        quantity: formData.value.stock,
+        price: formData.value.retailPrice,
+        adjustType: 'update', // 使用update类型表示直接更新库存
+        remark: '手动修改库存'
+      }
+
+      await axios.put(`/inventory/adjust`, requestData)
+      message.success('库存信息更新成功')
     } else {
+      // 新增操作 - 添加产品并同时创建库存
+      const requestData = {
+        name: formData.value.name,
+        category: formData.value.category,
+        specification: formData.value.specification,
+        manufacturer: formData.value.manufacturer,
+        approvalNumber: formData.value.approvalNumber,
+        retailPrice: formData.value.retailPrice,
+        costPrice: formData.value.costPrice,
+        stock: formData.value.stock,
+        image: imageUrl.value, // 使用本地预览URL（base64数据）
+        description: formData.value.description,
+        usage: formData.value.usage,
+        status: formData.value.status
+      }
+      
+      // 管理员需要选择门店
+      if (isAdminUser.value) {
+        if (!formData.value.storeId) {
+          message.error('请选择所属门店')
+          submitLoading.value = false
+          return
+        }
+        requestData.storeId = formData.value.storeId
+      }
+      
       await axios.post('/products', requestData)
       message.success('药品添加成功')
     }
@@ -569,8 +746,8 @@ const handleModalSubmit = async () => {
     modalVisible.value = false
     fetchProducts()
   } catch (error) {
-    console.error('保存药品信息失败:', error)
-    message.error(error.response?.data?.message || '保存药品信息失败')
+    console.error('保存信息失败:', error)
+    message.error(error.response?.data?.message || '保存信息失败')
   } finally {
     submitLoading.value = false
   }
@@ -578,7 +755,16 @@ const handleModalSubmit = async () => {
 
 // 组件挂载时获取数据
 onMounted(() => {
-  fetchProducts()
+  fetchUserInfo()
+  // 先获取门店列表，然后再获取产品列表
+  if (isAdminUser.value) {
+    fetchStoreList().then(() => {
+      // 确保门店列表加载完成后再获取产品
+      fetchProducts()
+    })
+  } else {
+    fetchProducts()
+  }
 })
 </script>
 

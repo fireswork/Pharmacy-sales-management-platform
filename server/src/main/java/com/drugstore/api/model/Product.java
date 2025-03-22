@@ -72,6 +72,9 @@ public class Product {
     @Column
     private String imageUrl; // 图片URL
 
+    @Column
+    private Long storeId; // 药品所属门店ID
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO; // 价格，默认为0
 
@@ -255,11 +258,28 @@ public class Product {
         this.price = price;
     }
 
+    public Long getStoreId() {
+        return storeId;
+    }
+
+    public void setStoreId(Long storeId) {
+        this.storeId = storeId;
+    }
+
     public Boolean getPrescription() {
         return prescription;
     }
 
     public void setPrescription(Boolean prescription) {
         this.prescription = prescription;
+    }
+
+    // 添加getCost方法，返回成本价格
+    public BigDecimal getCost() {
+        return this.costPrice;
+    }
+
+    public void setCost(BigDecimal cost) {
+        this.costPrice = cost;
     }
 } 

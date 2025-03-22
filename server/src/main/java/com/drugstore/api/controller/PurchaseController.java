@@ -44,6 +44,12 @@ public class PurchaseController {
     @Autowired
     private StoreInventoryRepository storeInventoryRepository;
 
+    @Autowired
+    private StoreRepository storeRepository;
+
+    @Autowired
+    private InventoryRecordRepository inventoryRecordRepository;
+
     // 获取采购列表
     @Transactional(readOnly = true)
     @GetMapping
@@ -52,9 +58,10 @@ public class PurchaseController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long storeId,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") Date date) {
         
-        System.out.println("查询参数: page=" + page + ", size=" + size + ", keyword=" + keyword + ", status=" + status + ", date=" + date);
+        System.out.println("查询参数: page=" + page + ", size=" + size + ", keyword=" + keyword + ", status=" + status + ", storeId=" + storeId + ", date=" + date);
         
         // 检查页码，确保从0开始
         if (page > 0) {
@@ -64,6 +71,45 @@ public class PurchaseController {
         Pageable pageable = PageRequest.of(page, size);
         
         try {
+            // 获取当前登录用户的角色和所属门店
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            User currentUser = userRepository.findByUsername(username);
+            
+            if (currentUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ApiResponse<>(null, 401, "未授权操作"));
+            }
+            
+            String userRole = currentUser.getRole();
+            Store userStore = null;
+            
+            // 如果是员工，获取关联的门店
+            if ("EMPLOYEE".equalsIgnoreCase(userRole)) {
+                Employee employee = employeeRepository.findByUser(currentUser);
+                if (employee != null) {
+                    userStore = employee.getStore();
+                }
+                // 员工必须关联门店才能查看采购列表
+                if (userStore == null) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(null, 403, "员工未关联门店，无法查看采购列表"));
+                }
+                // 员工只能查看自己门店的数据，忽略前端传来的storeId
+                storeId = userStore.getId();
+            } else if ("ADMIN".equalsIgnoreCase(userRole)) {
+                // 管理员可以查看所有门店数据，或根据传入的storeId筛选
+                if (storeId != null) {
+                    Optional<Store> storeOpt = storeRepository.findById(storeId);
+                    if (storeOpt.isPresent()) {
+                        userStore = storeOpt.get();
+                    } else {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(new ApiResponse<>(null, 400, "所选门店不存在"));
+                    }
+                }
+            }
+            
             // 先简单查询所有记录，确认数据库连接正常
             long totalCount = purchaseRepository.count();
             System.out.println("数据库中总记录数: " + totalCount);
@@ -76,13 +122,6 @@ public class PurchaseController {
                     "获取采购列表成功 (无数据)"
                 ));
             }
-            
-            // 查询第一页数据，确认能够获取数据
-            Page<Purchase> firstPage = purchaseRepository.findAll(PageRequest.of(0, size));
-            System.out.println("第一页数据: 总记录数=" + firstPage.getTotalElements() + ", 内容大小=" + firstPage.getContent().size());
-            
-            // 使用原始查询参数
-            Page<Purchase> purchasePage;
             
             // 处理日期范围
             Date startDate = null;
@@ -101,34 +140,30 @@ public class PurchaseController {
                 endDate = calendar.getTime();
             }
             
-            // 根据筛选条件查询
-            if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty() && date != null) {
-                purchasePage = purchaseRepository.findByKeywordAndStatusAndDate(keyword, status, startDate, endDate, pageable);
-            } else if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty()) {
-                purchasePage = purchaseRepository.findByKeywordAndStatus(keyword, status, pageable);
-            } else if (keyword != null && !keyword.isEmpty() && date != null) {
-                purchasePage = purchaseRepository.findByKeywordAndDate(keyword, startDate, endDate, pageable);
-            } else if (status != null && !status.isEmpty() && date != null) {
-                purchasePage = purchaseRepository.findByStatusAndCreateTimeBetween(status, startDate, endDate, pageable);
-            } else if (keyword != null && !keyword.isEmpty()) {
-                purchasePage = purchaseRepository.findByKeyword(keyword, pageable);
-            } else if (status != null && !status.isEmpty()) {
-                purchasePage = purchaseRepository.findByStatus(status, pageable);
-            } else if (date != null) {
-                purchasePage = purchaseRepository.findByCreateTimeBetween(startDate, endDate, pageable);
+            // 根据筛选条件和用户角色查询
+            Page<Purchase> purchasePage = null;
+            
+            if (userStore != null) {
+                // 带门店筛选的查询
+                if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty() && date != null) {
+                    purchasePage = purchaseRepository.findByKeywordAndStoreAndStatusAndDate(keyword, userStore, status, startDate, endDate, pageable);
+                } else if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty()) {
+                    purchasePage = purchaseRepository.findByKeywordAndStoreAndStatus(keyword, userStore, status, pageable);
+                } else if (keyword != null && !keyword.isEmpty() && date != null) {
+                    purchasePage = purchaseRepository.findByKeywordAndStoreAndDate(keyword, userStore, startDate, endDate, pageable);
+                } else if (status != null && !status.isEmpty() && date != null) {
+                    purchasePage = purchaseRepository.findByStoreAndStatusAndCreateTimeBetween(userStore, status, startDate, endDate, pageable);
+                } else if (keyword != null && !keyword.isEmpty()) {
+                    purchasePage = purchaseRepository.findByKeywordAndStore(keyword, userStore, pageable);
+                } else if (status != null && !status.isEmpty()) {
+                    purchasePage = purchaseRepository.findByStoreAndStatus(userStore, status, pageable);
+                } else if (date != null) {
+                    purchasePage = purchaseRepository.findByStoreAndCreateTimeBetween(userStore, startDate, endDate, pageable);
+                } else {
+                    purchasePage = purchaseRepository.findByStore(userStore, pageable);
+                }
             } else {
-                purchasePage = purchaseRepository.findAll(pageable);
-            }
-            
-            System.out.println("查询结果: 总记录数=" + purchasePage.getTotalElements() + ", 内容大小=" + purchasePage.getContent().size());
-            
-            if (purchasePage.getContent().isEmpty() && page > 0) {
-                System.out.println("警告: 当前页面没有数据，可能是页码超出范围");
-                // 如果请求的页码超出范围，返回第一页数据
-                page = 0;
-                pageable = PageRequest.of(page, size);
-                
-                // 重新查询第一页
+                // 管理员查看所有门店数据的查询
                 if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty() && date != null) {
                     purchasePage = purchaseRepository.findByKeywordAndStatusAndDate(keyword, status, startDate, endDate, pageable);
                 } else if (keyword != null && !keyword.isEmpty() && status != null && !status.isEmpty()) {
@@ -146,13 +181,25 @@ public class PurchaseController {
                 } else {
                     purchasePage = purchaseRepository.findAll(pageable);
                 }
+            }
+            
+            System.out.println("查询结果: 总记录数=" + purchasePage.getTotalElements() + ", 内容大小=" + purchasePage.getContent().size());
+            
+            if (purchasePage.getContent().isEmpty() && page > 0) {
+                System.out.println("警告: 当前页面没有数据，可能是页码超出范围");
+                // 如果请求的页码超出范围，返回第一页数据
+                page = 0;
+                pageable = PageRequest.of(page, size);
+                
+                // 重新查询第一页 (简化代码，仅返回通用的第一页)
+                if (userStore != null) {
+                    purchasePage = purchaseRepository.findByStore(userStore, pageable);
+                } else {
+                    purchasePage = purchaseRepository.findAll(pageable);
+                }
                 
                 System.out.println("重新查询第一页: 总记录数=" + purchasePage.getTotalElements() + ", 内容大小=" + purchasePage.getContent().size());
             }
-            
-            // 直接查询所有记录（用于调试）
-            List<Purchase> allPurchases = purchaseRepository.findAll();
-            System.out.println("直接查询所有记录: " + allPurchases.size());
             
             // 使用 JOIN FETCH 查询所有记录（不分页）
             List<Purchase> purchasesWithItems = purchaseRepository.findAllWithItems();
@@ -170,21 +217,10 @@ public class PurchaseController {
                     .findFirst()
                     .orElse(purchase);
                 
-                // 添加调试日志
-                System.out.println("处理采购单: ID=" + purchaseWithItems.getId() + 
-                                  ", 名称=" + purchaseWithItems.getName() + 
-                                  ", 项目数量=" + (purchaseWithItems.getItems() != null ? 
-                                                purchaseWithItems.getItems().size() : "null"));
-                
                 List<PurchaseItemResponse> itemResponses = new ArrayList<>();
                 
                 if (purchaseWithItems.getItems() != null) {
                     for (PurchaseItem item : purchaseWithItems.getItems()) {
-                        // 添加调试日志
-                        System.out.println("  项目: 产品ID=" + item.getProduct().getId() + 
-                                          ", 产品名称=" + item.getProduct().getName() + 
-                                          ", 数量=" + item.getQuantity());
-                        
                         itemResponses.add(new PurchaseItemResponse(
                             item.getProduct().getId(),
                             item.getProduct().getName(),
@@ -194,8 +230,13 @@ public class PurchaseController {
                     }
                 }
                 
-                // 添加调试日志
-                System.out.println("  转换后的项目数量: " + itemResponses.size());
+                // 获取门店信息
+                Long purchaseStoreId = null;
+                String purchaseStoreName = "";
+                if (purchaseWithItems.getStore() != null) {
+                    purchaseStoreId = purchaseWithItems.getStore().getId();
+                    purchaseStoreName = purchaseWithItems.getStore().getName();
+                }
                 
                 responseList.add(new PurchaseResponse(
                     purchaseWithItems.getId(),
@@ -207,11 +248,11 @@ public class PurchaseController {
                     purchaseWithItems.getStatus(),
                     purchaseWithItems.getReason() != null ? purchaseWithItems.getReason() : "",
                     purchaseWithItems.getComment() != null ? purchaseWithItems.getComment() : "",
-                    itemResponses
+                    itemResponses,
+                    purchaseStoreId,
+                    purchaseStoreName
                 ));
             }
-            
-            System.out.println("响应列表大小: " + responseList.size());
             
             // 创建分页响应
             Page<PurchaseResponse> responsePage = new PageImpl<>(
@@ -252,6 +293,14 @@ public class PurchaseController {
             }
         }
         
+        // 获取门店信息
+        Long storeId = null;
+        String storeName = "";
+        if (purchase.getStore() != null) {
+            storeId = purchase.getStore().getId();
+            storeName = purchase.getStore().getName();
+        }
+        
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         PurchaseResponse response = new PurchaseResponse(
             purchase.getId(),
@@ -263,7 +312,9 @@ public class PurchaseController {
             purchase.getStatus(),
             purchase.getReason() != null ? purchase.getReason() : "",
             purchase.getComment() != null ? purchase.getComment() : "",
-            itemResponses
+            itemResponses,
+            storeId,
+            storeName
         );
         
         return ResponseEntity.ok(new ApiResponse<>(response, 200, "获取采购详情成功"));
@@ -273,10 +324,6 @@ public class PurchaseController {
     @PostMapping
     public ResponseEntity<ApiResponse<PurchaseResponse>> createPurchase(@RequestBody PurchaseRequest request) {
         try {
-            // 打印整个请求对象，查看结构
-            System.out.println("Request: " + request);
-            System.out.println("Products: " + request.getProducts());
-            
             // 获取当前登录用户
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
@@ -317,19 +364,11 @@ public class PurchaseController {
             // 先保存采购单，获取ID
             Purchase savedPurchase = purchaseRepository.save(purchase);
             
-            // 打印保存后的ID，确认不为null
-            System.out.println("Saved Purchase ID: " + savedPurchase.getId());
-            
             // 处理采购药品
             if (request.getProducts() != null && !request.getProducts().isEmpty()) {
                 for (PurchaseItemRequest itemRequest : request.getProducts()) {
-                    // 打印整个itemRequest对象
-                    System.out.println("Item Request: " + itemRequest);
-                    System.out.println("Product ID: " + itemRequest.getProductId());
-                    
                     // 如果productId为null，跳过此项
                     if (itemRequest.getProductId() == null) {
-                        System.out.println("Skipping item with null productId");
                         continue;
                     }
                     
@@ -340,9 +379,6 @@ public class PurchaseController {
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                             .body(new ApiResponse<>(null, 400, "药品不存在，ID: " + itemRequest.getProductId()));
                     }
-                    
-                    // 打印找到的产品ID，确认不为null
-                    System.out.println("Found Product ID: " + product.getId());
                     
                     // 创建并保存每个采购项
                     PurchaseItem item = new PurchaseItem();
@@ -370,6 +406,14 @@ public class PurchaseController {
                 ));
             }
             
+            // 获取门店信息
+            Long storeId = null;
+            String storeName = "";
+            if (savedPurchase.getStore() != null) {
+                storeId = savedPurchase.getStore().getId();
+                storeName = savedPurchase.getStore().getName();
+            }
+            
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             PurchaseResponse response = new PurchaseResponse(
                 savedPurchase.getId(),
@@ -381,7 +425,9 @@ public class PurchaseController {
                 savedPurchase.getStatus(),
                 savedPurchase.getReason(),
                 "",
-                itemResponses
+                itemResponses,
+                storeId,
+                storeName
             );
             
             return ResponseEntity.status(HttpStatus.CREATED)
@@ -433,6 +479,14 @@ public class PurchaseController {
             ));
         }
         
+        // 获取门店信息
+        Long storeId = null;
+        String storeName = "";
+        if (savedPurchase.getStore() != null) {
+            storeId = savedPurchase.getStore().getId();
+            storeName = savedPurchase.getStore().getName();
+        }
+        
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         PurchaseResponse response = new PurchaseResponse(
             savedPurchase.getId(),
@@ -444,7 +498,9 @@ public class PurchaseController {
             savedPurchase.getStatus(),
             savedPurchase.getReason() != null ? savedPurchase.getReason() : "",
             savedPurchase.getComment() != null ? savedPurchase.getComment() : "",
-            itemResponses
+            itemResponses,
+            storeId,
+            storeName
         );
         
         return ResponseEntity.ok(new ApiResponse<>(response, 200, "采购申请已通过"));
@@ -485,6 +541,14 @@ public class PurchaseController {
             ));
         }
         
+        // 获取门店信息
+        Long storeId = null;
+        String storeName = "";
+        if (savedPurchase.getStore() != null) {
+            storeId = savedPurchase.getStore().getId();
+            storeName = savedPurchase.getStore().getName();
+        }
+        
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         PurchaseResponse response = new PurchaseResponse(
             savedPurchase.getId(),
@@ -496,7 +560,9 @@ public class PurchaseController {
             savedPurchase.getStatus(),
             savedPurchase.getReason() != null ? savedPurchase.getReason() : "",
             savedPurchase.getComment() != null ? savedPurchase.getComment() : "",
-            itemResponses
+            itemResponses,
+            storeId,
+            storeName
         );
         
         return ResponseEntity.ok(new ApiResponse<>(response, 200, "采购申请已拒绝"));
@@ -538,6 +604,14 @@ public class PurchaseController {
                 updateStoreInventory(updatedPurchase);
             }
             
+            // 获取门店信息
+            Long storeId = null;
+            String storeName = "";
+            if (updatedPurchase.getStore() != null) {
+                storeId = updatedPurchase.getStore().getId();
+                storeName = updatedPurchase.getStore().getName();
+            }
+            
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             PurchaseResponse response = new PurchaseResponse(
                 updatedPurchase.getId(),
@@ -555,7 +629,9 @@ public class PurchaseController {
                         item.getProduct().getName(),
                         item.getQuantity(),
                         item.getRemark() != null ? item.getRemark() : ""
-                    )).collect(Collectors.toList())
+                    )).collect(Collectors.toList()),
+                storeId,
+                storeName
             );
             
             return ResponseEntity.ok(new ApiResponse<>(response, 200, "更新成功"));
@@ -566,6 +642,7 @@ public class PurchaseController {
     }
 
     // 更新门店库存的方法
+    @Transactional
     private void updateStoreInventory(Purchase purchase) {
         if (purchase.getStore() == null) {
             System.out.println("警告: 采购单没有关联门店，无法更新库存");
@@ -574,6 +651,7 @@ public class PurchaseController {
         
         Store store = purchase.getStore();
         Date now = new Date();
+        User currentUser = getCurrentUser();
         
         for (PurchaseItem item : purchase.getItems()) {
             Product product = item.getProduct();
@@ -582,23 +660,51 @@ public class PurchaseController {
             // 查找是否已有该药品的库存记录
             Optional<StoreInventory> inventoryOpt = storeInventoryRepository.findByStoreAndProduct(store, product);
             
+            StoreInventory inventory;
             if (inventoryOpt.isPresent()) {
                 // 更新现有库存
-                StoreInventory inventory = inventoryOpt.get();
+                inventory = inventoryOpt.get();
                 inventory.setQuantity(inventory.getQuantity() + quantity);
                 inventory.setLastUpdateTime(now);
                 storeInventoryRepository.save(inventory);
                 System.out.println("更新门店 " + store.getName() + " 的药品 " + product.getName() + " 库存，新数量: " + inventory.getQuantity());
             } else {
                 // 创建新的库存记录
-                StoreInventory newInventory = new StoreInventory();
-                newInventory.setStore(store);
-                newInventory.setProduct(product);
-                newInventory.setQuantity(quantity);
-                newInventory.setLastUpdateTime(now);
-                storeInventoryRepository.save(newInventory);
+                inventory = new StoreInventory();
+                inventory.setStore(store);
+                inventory.setProduct(product);
+                inventory.setQuantity(quantity);
+                inventory.setLastUpdateTime(now);
+                storeInventoryRepository.save(inventory);
                 System.out.println("为门店 " + store.getName() + " 添加药品 " + product.getName() + " 库存，数量: " + quantity);
             }
+            
+            // 创建入库记录
+            InventoryRecord record = new InventoryRecord();
+            record.setStore(store);
+            record.setProduct(product);
+            record.setOperator(currentUser);
+            record.setRecordTime(now);
+            record.setRecordType("inbound");
+            record.setSourceType("purchase");
+            record.setSourceId(purchase.getId());
+            record.setQuantity(quantity);
+            record.setRemark("采购单号: " + purchase.getCode() + " 自动入库");
+            
+            // 保存入库记录
+            try {
+                inventoryRecordRepository.save(record);
+                System.out.println("已为采购单 " + purchase.getCode() + " 创建入库记录，商品: " + product.getName() + ", 数量: " + quantity);
+            } catch (Exception e) {
+                System.err.println("创建入库记录失败: " + e.getMessage());
+                throw new RuntimeException("创建入库记录失败", e);
+            }
         }
+    }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        return userRepository.findByUsername(username);
     }
 } 

@@ -1,7 +1,7 @@
 package com.drugstore.api.controller;
 
 import com.drugstore.api.model.*;
-import com.drugstore.api.repository.ProductRepository;
+import com.drugstore.api.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,11 +10,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import javax.persistence.criteria.Predicate;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +27,21 @@ public class ProductController {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private StoreRepository storeRepository;
+
+    @Autowired
+    private StoreInventoryRepository storeInventoryRepository;
+
+    @Autowired
+    private InventoryRecordRepository inventoryRecordRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     /**
      * 获取药品列表（支持分页、排序和筛选）
@@ -144,23 +162,24 @@ public class ProductController {
             
             product.setImage(productRequest.getImage());
             product.setDescription(productRequest.getDescription());
-            
-            // 设置库存，如果为null则默认为0
-            if (productRequest.getStock() != null) {
-                product.setStock(productRequest.getStock());
-            } else {
-                product.setStock(0);
-            }
-            
-            // 使用 setter 方法设置 usage 字段
-            if (productRequest.getUsage() != null) {
-                product.setUsage(productRequest.getUsage());
-            }
-            
-            product.setStatus(productRequest.getStatus());
+            product.setUsage(productRequest.getUsage());
+            product.setStatus("active");
             
             // 保存药品
             Product savedProduct = productRepository.save(product);
+            
+            // 创建门店库存记录
+            Long storeId = productRequest.getStoreId();
+            if (storeId == null) {
+                Store userStore = getCurrentUserStore();
+                if (userStore != null) {
+                    storeId = userStore.getId();
+                }
+            }
+            
+            if (storeId != null) {
+                createStoreInventory(savedProduct, storeId, productRequest.getStock());
+            }
             
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new ApiResponse<>(savedProduct, 201, "添加药品成功"));
@@ -179,6 +198,85 @@ public class ProductController {
         long count = productRepository.count();
         // 生成编号：P + 6位数字（从000001开始）
         return "P" + String.format("%06d", count + 1);
+    }
+
+    /**
+     * 创建门店库存记录
+     */
+    private void createStoreInventory(Product product, Long storeId, Integer quantity) {
+        try {
+            // 查找是否有此门店
+            Optional<Store> storeOpt = storeRepository.findById(storeId);
+            if (storeOpt.isEmpty()) {
+                throw new RuntimeException("门店不存在，ID: " + storeId);
+            }
+            
+            Store store = storeOpt.get();
+            Date now = new Date();
+            
+            // 创建新的库存记录
+            StoreInventory newInventory = new StoreInventory();
+            newInventory.setStore(store);
+            newInventory.setProduct(product);
+            newInventory.setQuantity(quantity);
+            newInventory.setLastUpdateTime(now);
+            StoreInventory savedInventory = storeInventoryRepository.save(newInventory);
+            
+            if (savedInventory == null) {
+                throw new RuntimeException("保存库存记录失败");
+            }
+            
+            // 增加创建库存记录
+            User currentUser = getCurrentUser();
+            if (currentUser != null) {
+                InventoryRecord record = new InventoryRecord();
+                record.setStore(store);
+                record.setProduct(product);
+                record.setRecordType("inbound");
+                record.setQuantity(quantity);
+                record.setRecordTime(now);
+                record.setSourceType("new_product");
+                record.setRemark("新增药品入库");
+                record.setOperator(currentUser);
+                
+                // 保存记录
+                inventoryRecordRepository.save(record);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("创建库存记录失败: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取当前用户关联的门店
+     */
+    private Store getCurrentUserStore() {
+        try {
+            User currentUser = getCurrentUser();
+            if (currentUser == null) return null;
+            
+            Employee employee = employeeRepository.findByUser(currentUser);
+            if (employee == null) return null;
+            
+            return employee.getStore();
+        } catch (Exception e) {
+            System.out.println("获取当前用户门店失败: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * 获取当前用户
+     */
+    private User getCurrentUser() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            return userRepository.findByUsername(username);
+        } catch (Exception e) {
+            System.out.println("获取当前用户失败: " + e.getMessage());
+            return null;
+        }
     }
 
     /**

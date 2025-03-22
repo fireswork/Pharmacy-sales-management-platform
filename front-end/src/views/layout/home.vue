@@ -3,6 +3,10 @@
     <a-spin :spinning="loading" tip="加载中..." size="large" class="global-loading">
       <a-layout-header class="header">
         <div class="header-left">
+          <div class="menu-trigger" @click="toggleCollapsed">
+            <MenuUnfoldOutlined v-if="collapsed" />
+            <MenuFoldOutlined v-else />
+          </div>
           <div class="logo">
             <svg class="logo-icon" viewBox="0 0 24 24">
               <path
@@ -10,14 +14,14 @@
                 d="M20,6H16V4A2,2 0 0,0 14,2H10A2,2 0 0,0 8,4V6H4C2.89,6 2,6.89 2,8V19A2,2 0 0,0 4,21H20A2,2 0 0,0 22,19V8C22,6.89 21.1,6 20,6M10,4H14V6H10V4M20,19H4V8H20V19M6,10H8V12H6V10M6,14H8V16H6V14M10,10H18V12H10V10M10,14H15V16H10V14Z"
               />
             </svg>
-            <span>药品管理系统</span>
+            <span v-if="!collapsed">药品管理系统</span>
           </div>
           <a-select
             v-model:value="currentStoreId"
-            style="width: 200px"
+            :style="{ width: collapsed ? '150px' : '200px' }"
             placeholder="请选择门店"
             @change="handleStoreChange"
-            v-if="userInfo?.role?.toUpperCase() === 'USER'"
+            v-if="userRole === 'USER'"
           >
             <a-select-option v-for="store in stores" :key="store.id" :value="store.id">
               {{ store?.name }}
@@ -47,75 +51,113 @@
       </a-layout-header>
 
       <a-layout>
-        <a-layout-sider width="240" class="sider">
+        <a-layout-sider 
+          :width="siderWidth" 
+          class="sider" 
+          :collapsed="collapsed"
+          :trigger="null"
+          collapsible
+        >
           <a-menu
             v-model:selectedKeys="selectedKeys"
-            v-model:openKeys="openKeys"
+            :openKeys="collapsed ? [] : openKeys"
             mode="inline"
+            :inline-collapsed="collapsed"
             class="side-menu"
           >
-            <a-menu-item key="products">
+            <!-- 所有用户可见 - 药品列表 -->
+            <a-menu-item key="products" v-if="userRole === 'USER'">
               <template #icon><MedicineBoxOutlined /></template>
               <router-link to="/home/products">药品列表</router-link>
             </a-menu-item>
-            <a-menu-item key="productsManagement">
-              <template #icon><DatabaseOutlined /></template>
+
+            <!-- 员工和管理员可见 - 药品管理 -->
+            <a-menu-item key="productsManagement" v-if="['ADMIN', 'EMPLOYEE'].includes(userRole)">
+              <template #icon><MedicineBoxTwoTone /></template>
               <router-link to="/home/productsManagement">药品管理</router-link>
             </a-menu-item>
-            <a-menu-item key="purchaseManagement">
+
+            <!-- 员工和管理员可见 - 采购管理 -->
+            <a-menu-item key="purchaseManagement" v-if="['ADMIN', 'EMPLOYEE'].includes(userRole)">
               <template #icon><ShoppingCartOutlined /></template>
               <router-link to="/home/purchaseManagement">采购管理</router-link>
             </a-menu-item>
-            <a-menu-item key="supplierManagement">
-              <template #icon><TeamOutlined /></template>
+
+            <!-- 员工和管理员可见 - 供应商管理 -->
+            <a-menu-item key="supplierManagement" v-if="['ADMIN', 'EMPLOYEE'].includes(userRole)">
+              <template #icon><ClusterOutlined /></template>
               <router-link to="/home/supplierManagement">供应商管理</router-link>
             </a-menu-item>
-            <a-menu-item key="storeManagement">
+
+            <!-- 仅管理员可见 - 分店管理 -->
+            <a-menu-item key="storeManagement" v-if="userRole === 'ADMIN'">
               <template #icon><ShopOutlined /></template>
               <router-link to="/home/storeManagement">分店管理</router-link>
             </a-menu-item>
-            <a-menu-item key="memberManagement">
+
+            <!-- 仅管理员可见 - 会员管理 -->
+            <a-menu-item key="memberManagement" v-if="userRole === 'ADMIN'">
               <template #icon><CrownOutlined /></template>
               <router-link to="/home/memberManagement">会员管理</router-link>
             </a-menu-item>
-            <a-menu-item key="employeeManagement">
-              <template #icon><ShopOutlined /></template>
+
+            <!-- 仅管理员可见 - 员工管理 -->
+            <a-menu-item key="employeeManagement" v-if="userRole === 'ADMIN'">
+              <template #icon><UserSwitchOutlined /></template>
               <router-link to="/home/employeeManagement">员工管理</router-link>
             </a-menu-item>
-            <a-menu-item key="order">
-              <template #icon><OrderedListOutlined /></template>
+
+            <!-- 仅管理员可见 - 订单管理 -->
+            <a-menu-item key="order" v-if="userRole !== 'EMPLOYEE'">
+              <template #icon><FileDoneOutlined /></template>
               <router-link to="/home/order">订单管理</router-link>
             </a-menu-item>
-            <a-menu-item key="warehouse">
-              <template #icon><InboxOutlined /></template>
+
+            <!-- 仅管理员可见 - 仓库管理 -->
+            <a-menu-item key="warehouse" v-if="userRole === 'ADMIN'">
+              <template #icon><HddOutlined /></template>
               <router-link to="/home/warehouse">仓库管理</router-link>
             </a-menu-item>
-            <a-menu-item key="finance">
+
+            <!-- 仅管理员可见 - 财务管理 -->
+            <a-menu-item key="finance" v-if="userRole === 'ADMIN'">
               <template #icon><AccountBookOutlined /></template>
               <router-link to="/home/finance">财务管理</router-link>
             </a-menu-item>
-            <a-menu-item key="cart">
+
+            <!-- 仅前台用户可见 - 购物车 -->
+            <a-menu-item key="cart" v-if="userRole === 'USER'">
               <template #icon><ShoppingOutlined /></template>
               <router-link to="/home/cart">购物车</router-link>
             </a-menu-item>
 
+            <!-- 个人中心菜单 - 所有用户可见，但根据角色显示不同内容 -->
             <a-sub-menu key="user">
               <template #icon><UserOutlined /></template>
               <template #title>个人中心</template>
+              
               <a-menu-item key="profile">
+                <template #icon><SolutionOutlined /></template>
                 <router-link to="/home/user/profile">个人信息</router-link>
               </a-menu-item>
-              <a-menu-item key="userAddress">
-                <router-link to="/home/user/address">收货地址</router-link>
-              </a-menu-item>
-              <a-menu-item key="favorites">
-                <template #icon><HeartOutlined /></template>
-                <router-link to="/home/user/favorites">我的收藏</router-link>
-              </a-menu-item>
-              <a-menu-item key="reviews">
-                <template #icon><CommentOutlined /></template>
-                <router-link to="/home/user/reviews">我的评价</router-link>
-              </a-menu-item>
+              
+              <!-- 仅前台用户可见 - 收货地址、收藏、评价 -->
+              <template v-if="userRole === 'USER'">
+                <a-menu-item key="userAddress">
+                  <template #icon><EnvironmentOutlined /></template>
+                  <router-link to="/home/user/address">收货地址</router-link>
+                </a-menu-item>
+                
+                <a-menu-item key="favorites">
+                  <template #icon><HeartOutlined /></template>
+                  <router-link to="/home/user/favorites">我的收藏</router-link>
+                </a-menu-item>
+                
+                <a-menu-item key="reviews">
+                  <template #icon><CommentOutlined /></template>
+                  <router-link to="/home/user/reviews">我的评价</router-link>
+                </a-menu-item>
+              </template>
             </a-sub-menu>
           </a-menu>
         </a-layout-sider>
@@ -129,13 +171,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from '@/utils/axios'
 import {
   DownOutlined,
   UserOutlined,
   MedicineBoxOutlined,
+  MedicineBoxTwoTone,
   DatabaseOutlined,
   ShoppingCartOutlined,
   ShoppingOutlined,
@@ -145,11 +188,18 @@ import {
   HeartOutlined,
   CommentOutlined,
   TeamOutlined,
+  ClusterOutlined,
   ShopOutlined,
   CrownOutlined,
   OrderedListOutlined,
+  FileDoneOutlined,
   InboxOutlined,
-  AccountBookOutlined
+  HddOutlined,
+  AccountBookOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  SolutionOutlined,
+  UserSwitchOutlined
 } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 
@@ -158,21 +208,42 @@ const router = useRouter()
 const selectedKeys = ref(['products'])
 const openKeys = ref(['user'])
 
+// 添加折叠状态控制
+const collapsed = ref(false)
+const siderWidth = computed(() => collapsed.value ? 80 : 240)
+
+// 切换折叠状态
+const toggleCollapsed = () => {
+  collapsed.value = !collapsed.value
+  // 在切换时保存状态到 localStorage，以便在页面刷新后保持相同状态
+  localStorage.setItem('menuCollapsed', collapsed.value)
+}
+
 // 添加 loading 状态
 const loading = ref(false)
 
 // 用户信息相关
 const userInfo = ref(null)
+const userRole = computed(() => userInfo.value?.role?.toUpperCase() || '')
 
 // 获取用户信息的方法
 const getUserInfo = async () => {
-  const response = await axios.get('/user')
-  if (response.code === 200) {
-    userInfo.value = response.data
-  }
-  if (response.data.role.toUpperCase() === 'USER') {
-    loading.value = true
-    fetchStores()
+  loading.value = true
+  try {
+    const response = await axios.get('/user')
+    if (response.code === 200) {
+      userInfo.value = response.data
+      localStorage.setItem('userRole', userInfo.value?.role?.toUpperCase() || '')
+      
+      // 根据用户角色加载门店信息
+      if (userInfo.value?.role?.toUpperCase() !== 'ADMIN') {
+        await fetchStores()
+      }
+    }
+  } catch (error) {
+    message.error('获取用户信息失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -200,9 +271,6 @@ const fetchStores = async () => {
     }
   } catch (error) {
     message.error('获取门店列表失败')
-  } finally {
-    // 无论成功失败，都关闭 loading
-    loading.value = false
   }
 }
 
@@ -215,7 +283,7 @@ const handleStoreChange = (storeId) => {
   
   // 如果当前在产品或库存页面，刷新数据
   const currentPath = router.currentRoute.value.path
-  if (currentPath.includes('/products') || currentPath.includes('/inventory')) {
+  if (currentPath.includes('/products') || currentPath.includes('/cart') || currentPath.includes('/favorites')) {
     router.go(0)  // 刷新当前页面
   }
 }
@@ -242,10 +310,37 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-// 在组件挂载时获取用户信息和门店列表
+// 获取菜单收起状态
+const getMenuCollapsedState = () => {
+  const savedState = localStorage.getItem('menuCollapsed')
+  if (savedState !== null) {
+    collapsed.value = savedState === 'true'
+  } else {
+    // 根据屏幕宽度自动设置初始状态
+    collapsed.value = window.innerWidth < 992
+  }
+}
+
+// 在组件挂载时获取用户信息、门店列表和菜单状态
 onMounted(() => {
   getUserInfo()
+  getMenuCollapsedState()
+  
+  // 添加窗口大小变化监听器，自动调整菜单状态
+  window.addEventListener('resize', handleResize)
 })
+
+// 组件卸载时移除监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+})
+
+// 处理窗口大小变化
+const handleResize = () => {
+  if (window.innerWidth < 768 && !collapsed.value) {
+    collapsed.value = true
+  }
+}
 </script>
 
 <style lang="less" scoped>
@@ -272,48 +367,54 @@ onMounted(() => {
 }
 
 .ant-layout {
-  height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 16px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 16px;
+
+    .menu-trigger {
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.3s;
+      padding: 0 8px;
+      
+      &:hover {
+        color: #1890ff;
+      }
+    }
 
     .logo {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
+      overflow: hidden;
+      transition: width 0.3s;
 
       .logo-icon {
-        width: 32px;
-        height: 32px;
+        width: 24px;
+        height: 24px;
         color: #1890ff;
-      }
-
-      img {
-        height: 36px;
-        width: auto;
+        flex-shrink: 0;
       }
 
       span {
         color: #1890ff;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
         white-space: nowrap;
+        transition: opacity 0.3s;
       }
-    }
-
-    .store-select {
-      width: 200px;
     }
   }
 
@@ -342,6 +443,18 @@ onMounted(() => {
 .sider {
   background: #fff;
   box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
+  transition: width 0.3s, min-width 0.3s;
+  overflow: hidden;
+
+  &.ant-layout-sider-collapsed {
+    .ant-menu-item {
+      padding-left: 24px !important;
+      
+      .ant-menu-title-content {
+        opacity: 0;
+      }
+    }
+  }
 
   :deep(.ant-menu) {
     .ant-menu-item {
@@ -404,6 +517,29 @@ onMounted(() => {
 
     .ant-menu-item {
       padding-left: 48px !important;
+    }
+  }
+}
+
+// 添加响应式样式
+@media (max-width: 767px) {
+  .header {
+    padding: 0 8px;
+
+    .header-left {
+      gap: 8px;
+      
+      .logo {
+        span {
+          display: none;
+        }
+      }
+    }
+    
+    .header-right {
+      .username {
+        display: none;
+      }
     }
   }
 }

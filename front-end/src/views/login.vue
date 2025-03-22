@@ -93,7 +93,7 @@
             name="password"
             :rules="[
               { required: true, message: '请输入密码!' },
-              { min: 8, message: '密码至少8个字符!' },
+              { min: 6, message: '密码至少6个字符!' },
               { validator: validatePasswordComplexity }
             ]"
           >
@@ -180,8 +180,8 @@ const validateConfirmPassword = async (rule, value) => {
 
 const validatePasswordComplexity = async (rule, value) => {
   // 检查密码长度
-  if (value.length < 8) {
-    throw new Error('密码长度至少为8个字符')
+  if (value.length < 6) {
+    throw new Error('密码长度至少为6个字符')
   }
   
   // 检查是否包含数字

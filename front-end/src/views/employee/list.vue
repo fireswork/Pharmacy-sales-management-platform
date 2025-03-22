@@ -50,6 +50,7 @@
         :pagination="pagination"
         :loading="loading"
         :row-key="record => record.code"
+        :scroll="{ x: 1000 }"
         bordered
         @change="handleTableChange"
       >
@@ -213,6 +214,7 @@ const columns = [
     title: '操作',
     key: 'action',
     width: 200,
+    fixed: 'right',
   }
 ]
 

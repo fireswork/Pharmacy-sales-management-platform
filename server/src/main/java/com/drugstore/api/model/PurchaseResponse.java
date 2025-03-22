@@ -13,10 +13,12 @@ public class PurchaseResponse {
     private String reason;
     private String comment;
     private List<PurchaseItemResponse> products;
+    private Long storeId;
+    private String storeName;
 
     public PurchaseResponse(Long id, String code, String name, Long supplierId, String applicant,
                            String createTime, String status, String reason, String comment,
-                           List<PurchaseItemResponse> products) {
+                           List<PurchaseItemResponse> products, Long storeId, String storeName) {
         this.id = id;
         this.code = code;
         this.name = name;
@@ -27,6 +29,8 @@ public class PurchaseResponse {
         this.reason = reason;
         this.comment = comment;
         this.products = products;
+        this.storeId = storeId;
+        this.storeName = storeName;
     }
 
     public PurchaseResponse() {
@@ -111,5 +115,21 @@ public class PurchaseResponse {
 
     public void setProducts(List<PurchaseItemResponse> products) {
         this.products = products;
+    }
+    
+    public Long getStoreId() {
+        return storeId;
+    }
+
+    public void setStoreId(Long storeId) {
+        this.storeId = storeId;
+    }
+
+    public String getStoreName() {
+        return storeName;
+    }
+
+    public void setStoreName(String storeName) {
+        this.storeName = storeName;
     }
 } 
