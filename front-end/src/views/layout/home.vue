@@ -108,9 +108,6 @@
               <a-menu-item key="userAddress">
                 <router-link to="/home/user/address">收货地址</router-link>
               </a-menu-item>
-              <a-menu-item key="userOrders">
-                <router-link to="/home/user/orders">我的订单</router-link>
-              </a-menu-item>
               <a-menu-item key="favorites">
                 <template #icon><HeartOutlined /></template>
                 <router-link to="/home/user/favorites">我的收藏</router-link>

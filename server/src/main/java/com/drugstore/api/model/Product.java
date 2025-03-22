@@ -75,6 +75,9 @@ public class Product {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO; // 价格，默认为0
 
+    @Column(name = "prescription")
+    private Boolean prescription = false;
+
     // Getters and Setters
     public Long getId() {
         return id;
@@ -250,5 +253,13 @@ public class Product {
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public Boolean getPrescription() {
+        return prescription;
+    }
+
+    public void setPrescription(Boolean prescription) {
+        this.prescription = prescription;
     }
 } 

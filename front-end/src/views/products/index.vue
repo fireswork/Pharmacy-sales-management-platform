@@ -45,6 +45,7 @@
             <a-card-meta :title="product.name">
               <template #description>
                 <div class="product-info">
+                  <div class="product-name">{{ product.productName }}</div>
                   <div class="price">¥{{ product.price || '暂无价格' }}</div>
                   <div class="stock">
                     库存: 
@@ -290,12 +291,30 @@ const closeDetails = () => {
 }
 
 // 加入购物车
-const addToCart = (product) => {
+const addToCart = async (product) => {
   if (!product.quantity) {
     message.warning(`${product.name} 当前无库存`)
     return
   }
-  message.success(`已将 ${product.name} 加入购物车`)
+  
+  try {
+    await request({
+      url: '/cart',
+      method: 'post',
+      data: {
+        productId: product.id,
+        storeId: localStorage.getItem('currentStoreId'),
+        quantity: 1
+      }
+    })
+    message.success(`已将 ${product.productName} 加入购物车`)
+  } catch (error) {
+    if (error.response?.status === 400) {
+      message.warning(error.response.data.message || '添加失败')
+    } else {
+      message.error('添加失败')
+    }
+  }
 }
 
 // 处理分页
@@ -340,6 +359,13 @@ onMounted(() => {
       }
 
       .product-info {
+        .product-name {
+          font-size: 16px;
+          font-weight: bold;
+          margin-bottom: 8px;
+          color: #262626;
+        }
+
         .price {
           color: #f5222d;
           font-size: 18px;

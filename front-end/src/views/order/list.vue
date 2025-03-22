@@ -16,10 +16,11 @@
             placeholder="订单状态"
             allow-clear
           >
-            <a-select-option value="pending">待付款</a-select-option>
-            <a-select-option value="paid">已付款</a-select-option>
-            <a-select-option value="completed">已完成</a-select-option>
-            <a-select-option value="cancelled">已取消</a-select-option>
+            <a-select-option value="PENDING">待付款</a-select-option>
+            <a-select-option value="PAID">已付款</a-select-option>
+            <a-select-option value="DELIVERING">已发货</a-select-option>
+            <a-select-option value="COMPLETED">已完成</a-select-option>
+            <a-select-option value="CANCELLED">已取消</a-select-option>
           </a-select>
           <a-select
             v-model:value="searchForm.storeId"
@@ -27,7 +28,11 @@
             placeholder="所属店铺"
             allow-clear
           >
-            <a-select-option v-for="store in storeOptions" :key="store.id" :value="store.id">
+            <a-select-option
+              v-for="store in storeOptions"
+              :key="store.id"
+              :value="store.id"
+            >
               {{ store.name }}
             </a-select-option>
           </a-select>
@@ -35,7 +40,7 @@
             v-model:value="searchForm.dateRange"
             style="width: 240px"
           />
-          <a-button type="primary" @click="handleSearch">
+          <a-button type="primary" @click="handleSearch" :loading="loading">
             <template #icon><SearchOutlined /></template>
             查询
           </a-button>
@@ -51,7 +56,8 @@
         :columns="columns"
         :data-source="orderList"
         :pagination="pagination"
-        :row-key="record => record.id"
+        :row-key="(record) => record.id"
+        :loading="loading"
         bordered
       >
         <template #bodyCell="{ column, record }">
@@ -61,7 +67,7 @@
               {{ getOrderStatusText(record.status) }}
             </a-tag>
           </template>
-          
+
           <!-- 支付方式列 -->
           <template v-if="column.key === 'paymentMethod'">
             <a-tag>{{ getPaymentMethodText(record.paymentMethod) }}</a-tag>
@@ -69,22 +75,36 @@
 
           <!-- 会员等级列 -->
           <template v-if="column.key === 'memberLevel'">
-            <a-tag :color="getMemberLevelColor(record.memberLevel)">
-              {{ getMemberLevelText(record.memberLevel) }}
+            <a-tag :color="getMemberLevelColor(record.user?.memberLevel)">
+              {{ getMemberLevelText(record.user?.memberLevel) }}
             </a-tag>
           </template>
-          
+
           <!-- 操作列 -->
           <template v-if="column.key === 'action'">
             <a-space>
-              <a-button type="link" size="small" @click="handleView(record)">查看</a-button>
-              <template v-if="record.status === 'pending'">
-                <a-button type="link" size="small" @click="handleConfirmPayment(record)">确认付款</a-button>
+              <a-button type="link" size="small" @click="handleView(record)"
+                >查看</a-button
+              >
+              <template v-if="record.status === 'PAID'">
+                <a-button
+                  type="link"
+                  size="small"
+                  @click="handleDelivery(record)"
+                  >发货</a-button
+                >
+              </template>
+              <template v-if="record.status === 'DELIVERING'">
+                <a-button
+                  type="link"
+                  size="small"
+                  @click="handleComplete(record)"
+                  >完成订单</a-button
+                >
+              </template>
+              <!-- <template v-if="record.status !== 'COMPLETED' && record.status !== 'CANCELLED'">
                 <a-button type="link" size="small" danger @click="handleCancel(record)">取消订单</a-button>
-              </template>
-              <template v-if="record.status === 'paid'">
-                <a-button type="link" size="small" @click="handleComplete(record)">完成订单</a-button>
-              </template>
+              </template> -->
             </a-space>
           </template>
         </template>
@@ -99,10 +119,18 @@
       width="900px"
     >
       <a-descriptions bordered :column="2">
-        <a-descriptions-item label="订单编号">{{ currentOrder.orderNo }}</a-descriptions-item>
-        <a-descriptions-item label="下单时间">{{ currentOrder.createTime }}</a-descriptions-item>
-        <a-descriptions-item label="会员姓名">{{ currentOrder.memberName }}</a-descriptions-item>
-        <a-descriptions-item label="会员手机">{{ currentOrder.memberPhone }}</a-descriptions-item>
+        <a-descriptions-item label="订单编号">{{
+          currentOrder.orderNumber
+        }}</a-descriptions-item>
+        <a-descriptions-item label="下单时间">{{
+          formatDate(currentOrder.createTime)
+        }}</a-descriptions-item>
+        <a-descriptions-item label="会员姓名">{{
+          currentOrder.user?.name || currentOrder.receiverName
+        }}</a-descriptions-item>
+        <a-descriptions-item label="联系电话">{{
+          currentOrder.user?.phone || currentOrder.receiverPhone
+        }}</a-descriptions-item>
         <a-descriptions-item label="订单状态">
           <a-tag :color="getOrderStatusColor(currentOrder.status)">
             {{ getOrderStatusText(currentOrder.status) }}
@@ -111,21 +139,32 @@
         <a-descriptions-item label="支付方式">
           <a-tag>{{ getPaymentMethodText(currentOrder.paymentMethod) }}</a-tag>
         </a-descriptions-item>
-        <a-descriptions-item label="所属店铺">{{ currentOrder.storeName }}</a-descriptions-item>
-        <a-descriptions-item label="操作员">{{ currentOrder.operatorName }}</a-descriptions-item>
+        <a-descriptions-item label="所属店铺">{{
+          currentOrder.store?.name
+        }}</a-descriptions-item>
+        <a-descriptions-item label="收货地址">{{
+          currentOrder.deliveryAddress
+        }}</a-descriptions-item>
       </a-descriptions>
 
       <div class="order-items">
         <h3>订单商品</h3>
         <a-table
           :columns="itemColumns"
-          :data-source="currentOrder.items"
+          :data-source="currentOrder.items || []"
           :pagination="false"
           bordered
         >
           <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'image'">
+              <img
+                :src="record.image"
+                :alt="record.productName"
+                class="product-image"
+              />
+            </template>
             <template v-if="column.key === 'amount'">
-              ¥{{ record.amount.toFixed(2) }}
+              ¥{{ calculateItemAmount(record).toFixed(2) }}
             </template>
           </template>
         </a-table>
@@ -134,15 +173,17 @@
       <div class="order-summary">
         <div class="summary-item">
           <span>商品总额：</span>
-          <span>¥{{ currentOrder.totalAmount }}</span>
+          <span>¥{{ currentOrder.totalAmount?.toFixed(2) }}</span>
         </div>
-        <div class="summary-item">
-          <span>会员折扣：</span>
-          <span>-¥{{ currentOrder.discount }}</span>
+        <div class="summary-item" v-if="currentOrder.discount">
+          <span>优惠金额：</span>
+          <span>-¥{{ currentOrder.discount?.toFixed(2) }}</span>
         </div>
         <div class="summary-item">
           <span>实付金额：</span>
-          <span class="amount">¥{{ currentOrder.actualAmount }}</span>
+          <span class="amount"
+            >¥{{ currentOrder.totalAmount?.toFixed(2) }}</span
+          >
         </div>
       </div>
     </a-modal>
@@ -150,262 +191,360 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { message } from 'ant-design-vue'
-import {
-  SearchOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons-vue'
-import dayjs from 'dayjs'
+import { ref, reactive, onMounted, computed } from "vue";
+import { message } from "ant-design-vue";
+import { SearchOutlined, ReloadOutlined } from "@ant-design/icons-vue";
+import dayjs from "dayjs";
+import request from "@/utils/axios";
 
 // 搜索表单
 const searchForm = ref({
-  keyword: '',
+  keyword: "",
   status: undefined,
   storeId: undefined,
-  dateRange: []
-})
+  dateRange: [],
+});
+
+// 状态管理
+const loading = ref(false);
+const orderList = ref([]);
+const total = ref(0);
+const currentPage = ref(1);
+const pageSize = ref(10);
+const storeOptions = ref([]);
+const detailVisible = ref(false);
+const currentOrder = ref({});
 
 // 表格列定义
 const columns = [
   {
-    title: '订单编号',
-    dataIndex: 'orderNo',
-    width: 180
+    title: "订单编号",
+    dataIndex: "orderNumber",
+    width: 180,
   },
   {
-    title: '会员姓名',
-    dataIndex: 'memberName',
-    width: 120
-  },
-  {
-    title: '会员等级',
-    dataIndex: 'memberLevel',
-    key: 'memberLevel',
-    width: 100
-  },
-  {
-    title: '订单金额',
-    dataIndex: 'totalAmount',
+    title: "会员姓名",
+    dataIndex: ["user", "name"],
     width: 120,
-    customRender: ({ text }) => `¥${text.toFixed(2)}`
+    customRender: ({ record }) => record.user?.name || record.receiverName,
   },
   {
-    title: '实付金额',
-    dataIndex: 'actualAmount',
+    title: "会员等级",
+    dataIndex: ["user", "memberLevel"],
+    key: "memberLevel",
+    width: 100,
+  },
+  {
+    title: "订单金额",
+    dataIndex: "totalAmount",
     width: 120,
-    customRender: ({ text }) => `¥${text.toFixed(2)}`
+    customRender: ({ text }) => `¥${(text || 0).toFixed(2)}`,
   },
   {
-    title: '支付方式',
-    dataIndex: 'paymentMethod',
-    key: 'paymentMethod',
-    width: 100
+    title: "支付方式",
+    dataIndex: "paymentMethod",
+    key: "paymentMethod",
+    width: 100,
   },
   {
-    title: '订单状态',
-    dataIndex: 'status',
-    key: 'status',
-    width: 100
+    title: "订单状态",
+    dataIndex: "status",
+    key: "status",
+    width: 100,
   },
   {
-    title: '所属店铺',
-    dataIndex: 'storeName',
-    width: 150
+    title: "所属店铺",
+    dataIndex: ["store", "name"],
+    width: 150,
   },
   {
-    title: '下单时间',
-    dataIndex: 'createTime',
-    width: 180
+    title: "下单时间",
+    dataIndex: "createTime",
+    width: 180,
+    customRender: ({ text }) => formatDate(text),
   },
   {
-    title: '操作',
-    key: 'action',
-    fixed: 'right',
-    width: 200
-  }
-]
+    title: "操作",
+    key: "action",
+    fixed: "right",
+    width: 200,
+  },
+];
 
 // 订单商品列定义
 const itemColumns = [
   {
-    title: '商品编号',
-    dataIndex: 'code',
-    width: 120
+    title: "商品图片",
+    dataIndex: "image",
+    key: "image",
+    width: 100,
   },
   {
-    title: '商品名称',
-    dataIndex: 'name'
+    title: "商品名称",
+    dataIndex: "productName",
   },
   {
-    title: '单价',
-    dataIndex: 'price',
+    title: "单价",
+    dataIndex: "price",
     width: 120,
-    customRender: ({ text }) => `¥${text.toFixed(2)}`
+    customRender: ({ text }) => `¥${(text || 0).toFixed(2)}`,
   },
   {
-    title: '数量',
-    dataIndex: 'quantity',
-    width: 100
+    title: "数量",
+    dataIndex: "quantity",
+    width: 100,
   },
   {
-    title: '金额',
-    dataIndex: 'amount',
-    key: 'amount',
-    width: 120
-  }
-]
-
-// 店铺选项
-const storeOptions = [
-  { id: 1, name: '总店' },
-  { id: 2, name: '分店1' },
-  { id: 3, name: '分店2' }
-]
+    title: "金额",
+    key: "amount",
+    width: 120,
+  },
+];
 
 // 会员等级配置
 const memberLevels = [
-  { value: 'bronze', label: '普通会员', color: '' },
-  { value: 'silver', label: '白银会员', color: 'cyan' },
-  { value: 'gold', label: '黄金会员', color: 'gold' },
-  { value: 'platinum', label: '铂金会员', color: 'purple' }
-]
-
-// 订单列表数据
-const orderList = ref([
-  {
-    id: 1,
-    orderNo: 'O202403150001',
-    memberName: '张三',
-    memberLevel: 'gold',
-    totalAmount: 500,
-    actualAmount: 450,
-    paymentMethod: 'wechat',
-    status: 'completed',
-    storeName: '总店',
-    createTime: '2024-03-15 10:20:00'
-  },
-  // ... 其他订单数据
-])
-
-// 当前查看的订单
-const currentOrder = ref({})
-
-// 弹窗控制
-const detailVisible = ref(false)
+  { value: "REGULAR", label: "普通会员", color: "" },
+  { value: "SILVER", label: "白银会员", color: "cyan" },
+  { value: "GOLD", label: "黄金会员", color: "gold" },
+  { value: "PLATINUM", label: "铂金会员", color: "purple" },
+];
 
 // 分页配置
-const pagination = {
-  total: orderList.value.length,
-  pageSize: 10,
-  showTotal: (total) => `共 ${total} 条记录`
-}
+const pagination = computed(() => ({
+  total: total.value,
+  current: currentPage.value,
+  pageSize: pageSize.value,
+  showSizeChanger: true,
+  pageSizeOptions: ["10", "20", "50"],
+  showTotal: (total) => `共 ${total} 条记录`,
+  onChange: (page, size) => {
+    currentPage.value = page;
+    pageSize.value = size;
+    fetchOrders();
+  },
+  onShowSizeChange: (current, size) => {
+    currentPage.value = 1;
+    pageSize.value = size;
+    fetchOrders();
+  },
+}));
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return "-";
+  return dayjs(dateStr).format("YYYY-MM-DD HH:mm");
+};
 
 // 获取订单状态颜色
 const getOrderStatusColor = (status) => {
   const colors = {
-    pending: 'warning',
-    paid: 'processing',
-    completed: 'success',
-    cancelled: 'default'
-  }
-  return colors[status]
-}
+    PENDING: "orange",
+    PAID: "blue",
+    DELIVERING: "green",
+    COMPLETED: "gray",
+    CANCELLED: "red",
+  };
+  return colors[status] || "default";
+};
 
 // 获取订单状态文本
 const getOrderStatusText = (status) => {
   const texts = {
-    pending: '待付款',
-    paid: '已付款',
-    completed: '已完成',
-    cancelled: '已取消'
-  }
-  return texts[status]
-}
+    PENDING: "待付款",
+    PAID: "已付款",
+    DELIVERING: "已发货",
+    COMPLETED: "已完成",
+    CANCELLED: "已取消",
+  };
+  return texts[status] || status;
+};
 
 // 获取支付方式文本
 const getPaymentMethodText = (method) => {
   const texts = {
-    cash: '现金',
-    wechat: '微信',
-    alipay: '支付宝',
-    card: '银行卡'
-  }
-  return texts[method]
-}
+    cash: "现金",
+    wechat: "微信",
+    alipay: "支付宝",
+    bank: "银行卡",
+    cbank: "银行卡",
+  };
+  return texts[method] || method;
+};
 
 // 获取会员等级颜色
 const getMemberLevelColor = (level) => {
-  const levelConfig = memberLevels.find(item => item.value === level)
-  return levelConfig ? levelConfig.color : ''
-}
+  const levelConfig = memberLevels.find((item) => item.value === level);
+  return levelConfig ? levelConfig.color : "";
+};
 
 // 获取会员等级文本
 const getMemberLevelText = (level) => {
-  const levelConfig = memberLevels.find(item => item.value === level)
-  return levelConfig ? levelConfig.label : ''
-}
+  const levelConfig = memberLevels.find((item) => item.value === level);
+  return levelConfig ? levelConfig.label : "普通用户";
+};
+
+// 计算订单项金额
+const calculateItemAmount = (item) => {
+  return (item.price || 0) * (item.quantity || 0);
+};
+
+// 获取订单列表
+const fetchOrders = async () => {
+  loading.value = true;
+  try {
+    const params = {
+      page: currentPage.value - 1,
+      size: pageSize.value,
+    };
+
+    if (searchForm.value.keyword) {
+      params.keyword = searchForm.value.keyword;
+    }
+
+    if (searchForm.value.status) {
+      params.status = searchForm.value.status;
+    }
+
+    if (searchForm.value.storeId) {
+      params.storeId = searchForm.value.storeId;
+    }
+
+    if (searchForm.value.dateRange && searchForm.value.dateRange.length === 2) {
+      params.startDate = dayjs(searchForm.value.dateRange[0]).format(
+        "YYYY-MM-DD"
+      );
+      params.endDate = dayjs(searchForm.value.dateRange[1]).format(
+        "YYYY-MM-DD"
+      );
+    }
+
+    const res = await request({
+      url: "/orders",
+      method: "get",
+      params,
+    });
+
+    if (res.code === 200) {
+      orderList.value = res.data || [];
+      total.value = res.total || orderList.value.length;
+    } else {
+      message.error(res.message || "获取订单列表失败");
+    }
+  } catch (error) {
+    console.error("获取订单列表失败:", error);
+    message.error("获取订单列表失败");
+  } finally {
+    loading.value = false;
+  }
+};
+
+// 获取店铺列表
+const fetchStores = async () => {
+  try {
+    const res = await request({
+      url: "/store",
+      method: "get",
+    });
+
+    if (res.code === 200) {
+      storeOptions.value = res.data || [];
+    } else {
+      console.error("获取店铺列表失败:", res.message);
+    }
+  } catch (error) {
+    console.error("获取店铺列表失败:", error);
+  }
+};
+
+// 获取订单详情
+const fetchOrderDetail = async (id) => {
+  try {
+    const res = await request({
+      url: `/orders/${id}`,
+      method: "get",
+    });
+
+    if (res.code === 200) {
+      currentOrder.value = res.data || {};
+      detailVisible.value = true;
+    } else {
+      message.error(res.message || "获取订单详情失败");
+    }
+  } catch (error) {
+    console.error("获取订单详情失败:", error);
+    message.error("获取订单详情失败");
+  }
+};
+
+// 更新订单状态
+const updateOrderStatus = async (id, status) => {
+  try {
+    const res = await request({
+      url: `/orders/${id}/status`,
+      method: "put",
+      params: {
+        status,
+      },
+    });
+
+    if (res.code === 200) {
+      message.success("操作成功");
+      fetchOrders();
+    } else {
+      message.error(res.message || "操作失败");
+    }
+  } catch (error) {
+    console.error("更新订单状态失败:", error);
+    message.error("操作失败");
+  }
+};
 
 // 处理函数
 const handleSearch = () => {
-  message.success('搜索成功')
-}
+  currentPage.value = 1;
+  fetchOrders();
+};
 
 const handleReset = () => {
   searchForm.value = {
-    keyword: '',
+    keyword: "",
     status: undefined,
     storeId: undefined,
-    dateRange: []
-  }
-  handleSearch()
-}
+    dateRange: [],
+  };
+  currentPage.value = 1;
+  fetchOrders();
+};
 
 const handleView = (record) => {
-  currentOrder.value = {
-    ...record,
-    memberPhone: '13800138000',
-    operatorName: '李四',
-    discount: 50,
-    items: [
-      {
-        id: 1,
-        code: 'MED001',
-        name: '布洛芬缓释胶囊',
-        price: 25.00,
-        quantity: 2,
-        amount: 50.00
-      },
-      {
-        id: 2,
-        code: 'MED002',
-        name: '感冒灵颗粒',
-        price: 15.00,
-        quantity: 3,
-        amount: 45.00
-      }
-    ]
-  }
-  detailVisible.value = true
-}
+  fetchOrderDetail(record.id);
+};
 
-const handleConfirmPayment = (record) => {
-  record.status = 'paid'
-  message.success('已确认付款')
-}
+const handleDelivery = (record) => {
+  updateOrderStatus(record.id, "DELIVERING");
+};
 
 const handleComplete = (record) => {
-  record.status = 'completed'
-  message.success('订单已完成')
-}
+  updateOrderStatus(record.id, "COMPLETED");
+};
 
 const handleCancel = (record) => {
-  record.status = 'cancelled'
-  message.success('订单已取消')
-}
+  updateOrderStatus(record.id, "CANCELLED");
+};
+
+// 页面初始化
+onMounted(() => {
+  fetchStores();
+  fetchOrders();
+});
 </script>
 
 <style lang="less" scoped>
+:deep(.product-image) {
+    width: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
 .order-container {
   padding: 16px;
 
@@ -418,7 +557,7 @@ const handleCancel = (record) => {
 
   .order-items {
     margin-top: 24px;
-    
+
     h3 {
       margin-bottom: 16px;
     }
@@ -440,4 +579,4 @@ const handleCancel = (record) => {
     }
   }
 }
-</style> 
+</style>

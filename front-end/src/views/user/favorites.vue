@@ -30,13 +30,13 @@
                 <div class="info-row">
                   <span class="label">库存：</span>
                   <span :class="getStockClass(item.quantity)">{{ item.quantity || 0 }}</span>
-                  <a-tag 
+                  <!-- <a-tag 
                     v-if="getStockStatus(item.quantity)" 
                     :color="getStockStatusColor(item.quantity)"
                     class="stock-tag"
                   >
                     {{ getStockStatus(item.quantity) }}
-                  </a-tag>
+                  </a-tag> -->
                 </div>
                 <div class="info-row">
                   <span class="label">类型：</span>
@@ -160,13 +160,30 @@ const removeFromFavorites = async (product) => {
 }
 
 // 加入购物车
-const addToCart = (product) => {
+const addToCart = async (product) => {
   if (!product.available || !product.inStock) {
     message.warning('商品已下架或缺货')
     return
   }
-  // TODO: 调用购物车接口
-  message.success('已加入购物车')
+
+  try {
+    await request({
+      url: '/cart',
+      method: 'post',
+      data: {
+        productId: product.productId,
+        storeId: localStorage.getItem('currentStoreId'),
+        quantity: 1
+      }
+    })
+    message.success('已加入购物车')
+  } catch (error) {
+    if (error.response?.status === 400) {
+      message.warning(error.response.data.message)
+    } else {
+      message.error('添加失败')
+    }
+  }
 }
 
 // 处理分页

@@ -1,6 +1,6 @@
 <template>
   <div class="cart-container">
-    <a-card class="cart-card">
+    <a-card class="cart-card" :loading="loading">
       <!-- 购物车头部 -->
       <div class="cart-header">
         <h2>我的购物车</h2>
@@ -15,10 +15,17 @@
           <template #renderItem="{ item }">
             <a-list-item>
               <div class="cart-item">
-                <a-checkbox v-model:checked="item.selected" @change="updateSelection"/>
-                <img :src="item.image" :alt="item.name" class="product-image"/>
+                <a-checkbox 
+                  v-model:checked="item.selected" 
+                  @change="() => updateSelection(item)"
+                />
+                <img 
+                  :src="item.image || 'https://via.placeholder.com/80x80?text=No+Image'" 
+                  :alt="item.productName" 
+                  class="product-image"
+                />
                 <div class="product-info">
-                  <div class="product-name">{{ item.name }}</div>
+                  <div class="product-name">{{ item.productName }}</div>
                   <div class="product-price">¥{{ item.price }}</div>
                 </div>
                 <div class="quantity-control">
@@ -35,10 +42,13 @@
                     shape="circle" 
                     size="small"
                     @click="updateQuantity(item, 1)"
-                    :disabled="item.quantity >= item.stock"
+                    :disabled="!item.inStock || !item.available || item.quantity >= item.stockQuantity"
                   >
                     <PlusOutlined />
                   </a-button>
+                  <span class="stock-info" v-if="item.stockQuantity">
+                    (库存: {{ item.stockQuantity }})
+                  </span>
                 </div>
                 <div class="item-total">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
                 <a-button type="link" danger @click="removeItem(item)">
@@ -85,26 +95,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { DeleteOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
+import request from '@/utils/axios'
 
 const router = useRouter()
-
-// 购物车数据
-const cartItems = ref([
-  {
-    id: 1,
-    name: '布洛芬缓释胶囊',
-    price: 35.8,
-    quantity: 1,
-    stock: 100,
-    image: 'https://example.com/medicine1.jpg',
-    selected: true
-  },
-  // 可以添加更多测试数据
-])
+const loading = ref(false)
+const cartItems = ref([])
 
 // 计算属性
 const selectedCount = computed(() => {
@@ -126,40 +125,130 @@ const isIndeterminate = computed(() => {
   return selectedCount > 0 && selectedCount < cartItems.value.length
 })
 
-// 方法
-const updateQuantity = (item, delta) => {
-  const newQuantity = item.quantity + delta
-  if (newQuantity >= 1 && newQuantity <= item.stock) {
-    item.quantity = newQuantity
+// 获取购物车列表
+const fetchCartItems = async () => {
+  loading.value = true
+  try {
+    const res = await request({
+      url: `/cart/store/${localStorage.getItem('currentStoreId')}`,
+      method: 'get'
+    })
+    cartItems.value = res.data
+  } catch (error) {
+    message.error('获取购物车失败')
+  } finally {
+    loading.value = false
   }
 }
 
-const removeItem = (item) => {
-  cartItems.value = cartItems.value.filter(i => i.id !== item.id)
-  message.success('商品已移除')
+// 更新商品数量
+const updateQuantity = async (item, delta) => {
+  const newQuantity = item.quantity + delta
+  if (newQuantity > item.stockQuantity) {
+    message.warning('超出库存数量')
+    return
+  }
+
+  try {
+    await request({
+      url: `/cart/${item.id}`,
+      method: 'put',
+      data: {
+        quantity: newQuantity,
+        storeId: localStorage.getItem('currentStoreId')
+      }
+    })
+    item.quantity = newQuantity
+  } catch (error) {
+    if (error.response?.status === 400) {
+      message.warning(error.response.data.message)
+    } else {
+      message.error('更新数量失败')
+    }
+  }
 }
 
+// 删除商品
+const removeItem = async (item) => {
+  try {
+    await request({
+      url: `/cart/${item.id}`,
+      method: 'delete'
+    })
+    cartItems.value = cartItems.value.filter(i => i.id !== item.id)
+    message.success('商品已移除')
+  } catch (error) {
+    message.error('删除失败')
+  }
+}
+
+// 清空购物车
 const clearCart = () => {
-  cartItems.value = []
-  message.success('购物车已清空')
+  Modal.confirm({
+    title: '确认清空购物车？',
+    content: '此操作将清空购物车中的所有商品',
+    async onOk() {
+      try {
+        await request({
+          url: `/cart/clear`,
+          method: 'delete',
+          params: {
+            storeId: localStorage.getItem('currentStoreId')
+          }
+        })
+        cartItems.value = []
+        message.success('购物车已清空')
+      } catch (error) {
+        message.error('清空购物车失败')
+      }
+    }
+  })
 }
 
-const toggleSelectAll = (e) => {
+// 更新选择状态
+const updateSelection = async (item) => {
+  try {
+    await request({
+      url: `/cart/${item.id}/select`,
+      method: 'put',
+      params: {
+        selected: item.selected
+      }
+    })
+  } catch (error) {
+    item.selected = !item.selected // 恢复状态
+    message.error('更新选择状态失败')
+  }
+}
+
+// 全选/取消全选
+const toggleSelectAll = async (e) => {
   const checked = e.target.checked
-  cartItems.value.forEach(item => item.selected = checked)
+  try {
+    await Promise.all(
+      cartItems.value.map(item => 
+        request({
+          url: `/cart/${item.id}/select`,
+          method: 'put',
+          params: {
+            selected: checked
+          }
+        })
+      )
+    )
+    cartItems.value.forEach(item => item.selected = checked)
+  } catch (error) {
+    message.error('更新选择状态失败')
+  }
 }
 
-const updateSelection = () => {
-  // 更新选择状态时可能需要做一些额外操作
-}
-
+// 结算
 const checkout = () => {
   if (selectedCount.value === 0) {
     message.warning('请选择要结算的商品')
     return
   }
   
-  // 跳转到结算页面，并传递总金额
   router.push({
     name: 'checkout',
     query: {
@@ -167,6 +256,11 @@ const checkout = () => {
     }
   })
 }
+
+// 页面加载时获取购物车数据
+onMounted(() => {
+  fetchCartItems()
+})
 </script>
 
 <style lang="less" scoped>
@@ -223,6 +317,11 @@ const checkout = () => {
           .quantity {
             min-width: 40px;
             text-align: center;
+          }
+
+          .stock-info {
+            color: #8c8c8c;
+            font-size: 12px;
           }
         }
 
