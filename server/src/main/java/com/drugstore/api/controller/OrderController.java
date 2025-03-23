@@ -146,7 +146,18 @@ public class OrderController {
                 orderItem.setOrder(order);
                 orderItem.setProduct(cartItem.getProduct());
                 orderItem.setQuantity(cartItem.getQuantity());
-                orderItem.setPrice(cartItem.getProduct().getPrice());
+                
+                // 检查用户是否为会员，设置折扣价
+                BigDecimal price = cartItem.getProduct().getPrice();
+                if (user != null) {
+                    Member member = memberRepository.findByUser(user);
+                    if (member != null && member.getIsRegistered() != null && member.getIsRegistered()) {
+                        // 会员价格打9折
+                        price = price.multiply(new BigDecimal("0.9")).setScale(2, BigDecimal.ROUND_HALF_UP);
+                    }
+                }
+                orderItem.setPrice(price);
+                
                 orderItems.add(orderItem);
                 
                 // 减少门店商品库存
@@ -333,6 +344,7 @@ public class OrderController {
     }
 
     // 更新会员积分和累计消费（订单完成时调用）
+    // 注意：会员折扣价已在订单创建时处理，会员购买商品享受9折优惠
     private void updateMemberPointsAndSpending(Order order) {
         User user = order.getUser();
         // 检查用户是否为会员
@@ -496,8 +508,26 @@ public class OrderController {
     }
 
     private BigDecimal calculateTotal(List<CartItem> cartItems) {
+        // 获取第一个购物车项目的用户（假设所有项目都属于同一用户）
+        User user = cartItems.isEmpty() ? null : cartItems.get(0).getUser();
+        boolean isMember = false;
+        
+        // 检查用户是否为会员
+        if (user != null) {
+            Member member = memberRepository.findByUser(user);
+            if (member != null && member.getIsRegistered() != null && member.getIsRegistered()) {
+                isMember = true;
+            }
+        }
+        
+        // 计算总金额（会员打9折）
+        BigDecimal discount = isMember ? new BigDecimal("0.9") : BigDecimal.ONE;
+        
         return cartItems.stream()
-            .map(item -> item.getProduct().getPrice().multiply(new BigDecimal(item.getQuantity())))
+            .map(item -> item.getProduct().getPrice()
+                .multiply(new BigDecimal(item.getQuantity()))
+                .multiply(discount)
+                .setScale(2, BigDecimal.ROUND_HALF_UP))
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

@@ -17,12 +17,14 @@ public class CartResponse {
     private Boolean inStock;
     private Boolean prescription;
     private Integer stockQuantity;
+    private Boolean isMember;
+    private BigDecimal memberPrice;
 
     public CartResponse(Long id, Long productId, String productName, String productCode,
                        String specification, String manufacturer, BigDecimal price,
                        String image, Integer quantity, Boolean selected,
                        Boolean available, Boolean inStock, Boolean prescription,
-                       Integer stockQuantity) {
+                       Integer stockQuantity, Boolean isMember, BigDecimal memberPrice) {
         this.id = id;
         this.productId = productId;
         this.productName = productName;
@@ -37,6 +39,8 @@ public class CartResponse {
         this.inStock = inStock;
         this.prescription = prescription;
         this.stockQuantity = stockQuantity;
+        this.isMember = isMember;
+        this.memberPrice = memberPrice;
     }
 
     // Getters
@@ -94,5 +98,13 @@ public class CartResponse {
 
     public Integer getStockQuantity() {
         return stockQuantity;
+    }
+    
+    public Boolean getIsMember() {
+        return isMember;
+    }
+    
+    public BigDecimal getMemberPrice() {
+        return memberPrice;
     }
 } 

@@ -178,7 +178,7 @@
       title="商品评价"
       :width="700"
       @ok="submitReview"
-      :okText="'提交评价'"
+      :okText="reviewableItems.length ? '提交评价' : '确定'"
       :cancelText="'取消'"
       :confirmLoading="reviewSubmitting"
     >
@@ -688,6 +688,11 @@ const handleReviewItemChange = (productId) => {
 
 // 处理评价提交
 const submitReview = async () => {
+  if (reviewableItems.value.length === 0) {
+    reviewVisible.value = false;
+    return;
+  }
+
   if (!reviewForm.productId) {
     message.error("请选择要评价的商品");
     return;

@@ -10,6 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Optional;
@@ -31,6 +32,9 @@ public class CartController {
 
     @Autowired
     private StoreInventoryRepository inventoryRepository;
+
+    @Autowired
+    private MemberRepository memberRepository;
 
     // 获取购物车列表
     @GetMapping("/store/{storeId}")
@@ -145,6 +149,22 @@ public class CartController {
         
         int stockQuantity = inventory.map(StoreInventory::getQuantity).orElse(0);
         boolean inStock = stockQuantity > 0;
+        
+        // 检查用户是否为会员并获取会员折扣价格
+        BigDecimal price = product.getPrice();
+        BigDecimal memberPrice = null;
+        boolean isMember = false;
+        
+        // 获取用户的会员信息
+        User user = cartItem.getUser();
+        if (user != null) {
+            Member member = memberRepository.findByUser(user);
+            if (member != null && member.getIsRegistered() != null && member.getIsRegistered()) {
+                isMember = true;
+                // 会员价格打9折
+                memberPrice = price.multiply(new BigDecimal("0.9")).setScale(2, BigDecimal.ROUND_HALF_UP);
+            }
+        }
 
         return new CartResponse(
             cartItem.getId(),
@@ -153,14 +173,16 @@ public class CartController {
             product.getCode(),
             product.getSpecification(),
             product.getManufacturer(),
-            product.getPrice(),
+            price,
             product.getImage(),
             cartItem.getQuantity(),
             cartItem.getSelected(),
             "active".equals(product.getStatus()),
             inStock,
             product.getPrescription(),
-            stockQuantity
+            stockQuantity,
+            isMember,
+            memberPrice
         );
     }
 } 

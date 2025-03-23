@@ -342,47 +342,10 @@ const fetchProducts = async () => {
     // 获取收藏状态
     await fetchFavorites();
 
-    // 获取各商品的评分统计
-    await fetchProductRatings();
   } catch (error) {
     message.error("获取药品列表失败");
   } finally {
     loading.value = false;
-  }
-};
-
-// 获取商品评分统计
-const fetchProductRatings = async () => {
-  try {
-    // 批量获取商品ID
-    const productIds = products.value.map((p) => p.id);
-    if (productIds.length === 0) return;
-
-    const res = await request({
-      url: `/reviews/ratings`,
-      method: "get",
-      params: {
-        productIds: productIds.join(","),
-      },
-    });
-
-    if (res.code === 200 && res.data) {
-      // 更新商品评分信息
-      products.value = products.value.map((product) => {
-        const ratingInfo = res.data.find((r) => r.productId === product.id);
-        if (ratingInfo) {
-          return {
-            ...product,
-            rating: ratingInfo.averageRating,
-            reviewCount: ratingInfo.reviewCount,
-          };
-        }
-        return product;
-      });
-    }
-  } catch (error) {
-    console.error("获取商品评分失败:", error);
-    // 错误处理 - 静默失败，不影响主要功能
   }
 };
 
