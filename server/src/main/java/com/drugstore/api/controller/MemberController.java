@@ -76,7 +76,8 @@ public class MemberController {
                 member.getPoints(),
                 member.getTotalSpending(),
                 member.getRegistrationTime() != null ? member.getRegistrationTime().toString() : "",
-                member.getStatus()
+                member.getStatus(),
+                member.getIsRegistered() != null ? member.getIsRegistered() : false
             );
         });
         
@@ -113,6 +114,7 @@ public class MemberController {
         member.setPoints(0);
         member.setTotalSpending(0.0);
         member.setMemberLevel("bronze");
+        member.setIsRegistered(true); // 设置为已注册
         
         // 生成会员ID
         long count = memberRepository.count();
@@ -134,7 +136,8 @@ public class MemberController {
             savedMember.getPoints(),
             savedMember.getTotalSpending(),
             savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
-            savedMember.getStatus()
+            savedMember.getStatus(),
+            savedMember.getIsRegistered() != null ? savedMember.getIsRegistered() : false
         );
         
         UserInfoResponse userInfo = new UserInfoResponse(
@@ -177,7 +180,8 @@ public class MemberController {
             savedMember.getPoints(),
             savedMember.getTotalSpending(),
             savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
-            savedMember.getStatus()
+            savedMember.getStatus(),
+            savedMember.getIsRegistered() != null ? savedMember.getIsRegistered() : false
         );
         
         return ResponseEntity.ok(new ApiResponse<>(memberInfo, 200, "会员状态更新成功"));
@@ -245,7 +249,8 @@ public class MemberController {
             member.getPoints(),
             member.getTotalSpending(),
             member.getRegistrationTime() != null ? member.getRegistrationTime().toString() : "",
-            member.getStatus()
+            member.getStatus(),
+            member.getIsRegistered() != null ? member.getIsRegistered() : false
         );
         
         return ResponseEntity.ok(new ApiResponse<>(memberInfo, 200, "获取会员信息成功"));
@@ -297,6 +302,9 @@ public class MemberController {
         if (updateRequest.getGender() != null) {
             member.setGender(updateRequest.getGender());
         }
+        if (updateRequest.getIsRegistered() != null) {
+            member.setIsRegistered(updateRequest.getIsRegistered());
+        }
         
         // 保存会员信息
         Member savedMember = memberRepository.save(member);
@@ -313,7 +321,8 @@ public class MemberController {
             savedMember.getPoints(),
             savedMember.getTotalSpending(),
             savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
-            savedMember.getStatus()
+            savedMember.getStatus(),
+            savedMember.getIsRegistered() != null ? savedMember.getIsRegistered() : false
         );
         
         return ResponseEntity.ok(new ApiResponse<>(memberInfo, 200, "会员信息更新成功"));
@@ -349,6 +358,9 @@ public class MemberController {
         if (updateRequest.getGender() != null) {
             member.setGender(updateRequest.getGender());
         }
+        if (updateRequest.getIsRegistered() != null) {
+            member.setIsRegistered(updateRequest.getIsRegistered());
+        }
         
         // 保存会员信息
         Member savedMember = memberRepository.save(member);
@@ -365,7 +377,8 @@ public class MemberController {
             savedMember.getPoints(),
             savedMember.getTotalSpending(),
             savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
-            savedMember.getStatus()
+            savedMember.getStatus(),
+            savedMember.getIsRegistered() != null ? savedMember.getIsRegistered() : false
         );
         
         return ResponseEntity.ok(new ApiResponse<>(memberInfo, 200, "会员信息更新成功"));

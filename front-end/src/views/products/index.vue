@@ -21,33 +21,63 @@
     <!-- 药品列表 -->
     <div class="products-list">
       <a-row :gutter="[16, 16]">
-        <a-col :xs="24" :sm="12" :md="8" :lg="6" v-for="product in products" :key="product.id">
+        <a-col
+          :xs="24"
+          :sm="12"
+          :md="8"
+          :lg="6"
+          v-for="product in products"
+          :key="product.id"
+        >
           <a-card hoverable class="product-card">
             <template #cover>
-              <img :src="product.image || 'https://via.placeholder.com/300x200?text=No+Image'" :alt="product.name" />
+              <img
+                :src="
+                  product.image ||
+                  'https://via.placeholder.com/300x200?text=No+Image'
+                "
+                :alt="product.name"
+              />
             </template>
             <a-card-meta :title="product.name">
               <template #description>
                 <div class="product-info">
                   <div class="product-name">{{ product.productName }}</div>
-                  <div class="price">¥{{ product.price || '暂无价格' }}</div>
+                  <div class="price">
+                    <span v-if="isMember">¥{{ (product.price * 0.9).toFixed(2) }}</span>
+                    <span :class="isMember ? 'member-price' : ''"
+                      >¥{{ product.price?.toFixed(2) }}</span
+                    >
+                  </div>
                   <div class="stock">
-                    库存: 
+                    库存:
                     <span :class="getStockClass(product.quantity)">
                       {{ product.quantity || 0 }}
                     </span>
-                    <a-tag v-if="getStockStatus(product.quantity)" :color="getStockStatusColor(product.quantity)" >
+
+                    <a-tag
+                      v-if="getStockStatus(product.quantity)"
+                      :color="getStockStatusColor(product.quantity)"
+                    >
                       {{ getStockStatus(product.quantity) }}
                     </a-tag>
                   </div>
                   <div class="description">{{ product.description }}</div>
                   <a-tag v-if="product.prescription" color="red">处方药</a-tag>
                   <a-tag v-else color="green">非处方药</a-tag>
-                  
+
                   <!-- 添加评分展示 -->
                   <div class="product-reviews" v-if="product.rating">
-                    <a-rate :value="product.rating" disabled allow-half :count="5" class="review-stars" />
-                    <span class="review-count">({{ product.reviewCount || 0 }})</span>
+                    <a-rate
+                      :value="product.rating"
+                      disabled
+                      allow-half
+                      :count="5"
+                      class="review-stars"
+                    />
+                    <span class="review-count"
+                      >({{ product.reviewCount || 0 }})</span
+                    >
                   </div>
                 </div>
               </template>
@@ -56,10 +86,10 @@
               <a-button type="link" @click="toggleFavorite(product)">
                 <HeartOutlined v-if="!product.isFavorite" />
                 <HeartFilled v-else style="color: #ff4d4f" />
-                {{ product.isFavorite ? '已收藏' : '收藏' }}
+                {{ product.isFavorite ? "已收藏" : "收藏" }}
               </a-button>
-              <a-button 
-                type="primary" 
+              <a-button
+                type="primary"
                 @click="addToCart(product)"
                 :disabled="!product.quantity"
               >
@@ -96,39 +126,53 @@
     >
       <div class="product-detail" v-if="selectedProduct">
         <div class="detail-image">
-          <img 
-            :src="selectedProduct.image || 'https://via.placeholder.com/300x200?text=No+Image'" 
-            :alt="selectedProduct.name" 
+          <img
+            :src="
+              selectedProduct.image ||
+              'https://via.placeholder.com/300x200?text=No+Image'
+            "
+            :alt="selectedProduct.name"
           />
         </div>
         <div class="detail-info">
           <h3>基本信息</h3>
-          <p><strong>价格：</strong>¥{{ selectedProduct.price || '暂无价格' }}</p>
+          <p>
+            <strong>价格：</strong>¥{{ selectedProduct.price || "暂无价格" }}
+          </p>
           <p>
             <strong>库存：</strong>
             <span :class="getStockClass(selectedProduct.quantity)">
               {{ selectedProduct.quantity || 0 }}
             </span>
-            <a-tag v-if="getStockStatus(selectedProduct.quantity)" :color="getStockStatusColor(selectedProduct.quantity)">
+            <a-tag
+              v-if="getStockStatus(selectedProduct.quantity)"
+              :color="getStockStatusColor(selectedProduct.quantity)"
+            >
               {{ getStockStatus(selectedProduct.quantity) }}
             </a-tag>
           </p>
-          <p><strong>类型：</strong>{{ selectedProduct.prescription ? '处方药' : '非处方药' }}</p>
+          <p>
+            <strong>类型：</strong
+            >{{ selectedProduct.prescription ? "处方药" : "非处方药" }}
+          </p>
           <h3>适用症状</h3>
-          <p>{{ selectedProduct.symptoms || '暂无信息' }}</p>
+          <p>{{ selectedProduct.symptoms || "暂无信息" }}</p>
           <h3>使用方法</h3>
-          <p>{{ selectedProduct.usage || '暂无信息' }}</p>
+          <p>{{ selectedProduct.usage || "暂无信息" }}</p>
           <h3>注意事项</h3>
-          <p>{{ selectedProduct.precautions || '暂无信息' }}</p>
+          <p>{{ selectedProduct.precautions || "暂无信息" }}</p>
         </div>
       </div>
-      
+
       <!-- 评价列表 -->
       <a-divider orientation="left">
         <span class="reviews-title">用户评价</span>
-        <a-badge :count="productReviews.length" :number-style="{ backgroundColor: '#52c41a' }" />
+        <a-badge
+          :count="productReviews.length"
+          :number-style="{ backgroundColor: '#52c41a' }"
+        />
       </a-divider>
-      
+
       <div class="reviews-section">
         <div v-if="productReviews.length === 0" class="empty-reviews">
           <a-empty description="暂无评价" />
@@ -141,21 +185,23 @@
                   <template #title>
                     <div class="review-header">
                       <a-rate :value="item.rating" disabled allow-half />
-                      <span class="review-time">{{ formatDate(item.createTime) }}</span>
+                      <span class="review-time">{{
+                        formatDate(item.createTime)
+                      }}</span>
                     </div>
                   </template>
                   <template #description>
                     <div class="review-content">{{ item.content }}</div>
                   </template>
                   <template #avatar>
-                    <a-avatar 
+                    <a-avatar
                       :style="{ backgroundColor: getAvatarColor(item.userId) }"
                     >
                       {{ getUserInitial(item.username) }}
                     </a-avatar>
                   </template>
                 </a-list-item-meta>
-                
+
                 <div v-if="item.images" class="review-images">
                   <a-image-preview-group>
                     <a-image
@@ -169,7 +215,7 @@
               </a-list-item>
             </template>
           </a-list>
-          
+
           <div class="reviews-pagination" v-if="productReviews.length > 5">
             <a-pagination
               v-model:current="reviewPagination.current"
@@ -186,202 +232,206 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { ShoppingCartOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import request from '@/utils/axios'
-import dayjs from 'dayjs'
+import { ref, reactive, onMounted, computed } from "vue";
+import {
+  ShoppingCartOutlined,
+  HeartOutlined,
+  HeartFilled,
+} from "@ant-design/icons-vue";
+import { message } from "ant-design-vue";
+import request from "@/utils/axios";
+import dayjs from "dayjs";
 
 // 搜索表单
 const searchForm = reactive({
-  keyword: '',
-  category: undefined
-})
+  keyword: "",
+  category: undefined,
+});
 
 // 分类数据
 const categories = [
-  { label: '感冒用药', value: 'cold' },
-  { label: '消化系统', value: 'digest' },
-  { label: '心脑血管', value: 'heart' },
-  { label: '维生素', value: 'vitamin' }
-]
+  { label: "感冒用药", value: "cold" },
+  { label: "消化系统", value: "digest" },
+  { label: "心脑血管", value: "heart" },
+  { label: "维生素", value: "vitamin" },
+];
 
 // 分页数据
 const pagination = reactive({
   current: 1,
   pageSize: 12,
-  total: 0
-})
+  total: 0,
+});
 
 // 评价分页数据
 const reviewPagination = reactive({
   current: 1,
   pageSize: 5,
-  total: 0
-})
+  total: 0,
+});
 
 // 药品数据
-const products = ref([])
-const loading = ref(false)
+const products = ref([]);
+const loading = ref(false);
 
 // 详情弹窗
-const detailVisible = ref(false)
-const selectedProduct = ref(null)
+const detailVisible = ref(false);
+const selectedProduct = ref(null);
 
 // 评价数据
-const productReviews = ref([])
-const reviewsLoading = ref(false)
+const productReviews = ref([]);
+const reviewsLoading = ref(false);
 
 // 格式化日期
 const formatDate = (dateStr) => {
-  if (!dateStr) return '-'
-  return dayjs(dateStr).format('YYYY-MM-DD HH:mm')
-}
+  if (!dateStr) return "-";
+  return dayjs(dateStr).format("YYYY-MM-DD HH:mm");
+};
 
 // 获取用户头像颜色
 const getAvatarColor = (userId) => {
-  const colors = ['#f56a00', '#7265e6', '#ffbf00', '#00a2ae', '#87d068']
-  const index = userId ? (userId % colors.length) : 0
-  return colors[index]
-}
+  const colors = ["#f56a00", "#7265e6", "#ffbf00", "#00a2ae", "#87d068"];
+  const index = userId ? userId % colors.length : 0;
+  return colors[index];
+};
 
 // 获取用户名首字母
 const getUserInitial = (username) => {
-  if (!username) return '用'
-  return username.charAt(0).toUpperCase()
-}
+  if (!username) return "用";
+  return username.charAt(0).toUpperCase();
+};
 
 // 获取收藏列表
 const fetchFavorites = async () => {
   try {
     const res = await request({
-      url: '/favorites',
-      method: 'get',
+      url: "/favorites",
+      method: "get",
       params: {
-        storeId: localStorage.getItem('currentStoreId')
-      }
-    })
+        storeId: localStorage.getItem("currentStoreId"),
+      },
+    });
     // 更新产品的收藏状态
-    const favoriteProductIds = res.data.map(item => item.productId)
-    products.value = products.value.map(product => ({
+    const favoriteProductIds = res.data.map((item) => item.productId);
+    products.value = products.value.map((product) => ({
       ...product,
-      isFavorite: favoriteProductIds.includes(product.id)
-    }))
+      isFavorite: favoriteProductIds.includes(product.id),
+    }));
   } catch (error) {
-    message.error('获取收藏列表失败')
+    message.error("获取收藏列表失败");
   }
-}
+};
 
 // 获取药品列表
 const fetchProducts = async () => {
-  loading.value = true
+  loading.value = true;
   try {
     const res = await request({
-      url: `/inventory/store/${localStorage.getItem('currentStoreId')}`,
-      method: 'get',
+      url: `/inventory/store/${localStorage.getItem("currentStoreId")}`,
+      method: "get",
       params: {
         keyword: searchForm.keyword,
         page: pagination.current - 1,
-        size: pagination.pageSize
-      }
-    })
-    
-    products.value = res.data.content || []
-    pagination.total = res.data.totalElements || 0
-    
+        size: pagination.pageSize,
+      },
+    });
+
+    products.value = res.data.content || [];
+    pagination.total = res.data.totalElements || 0;
+
     // 获取收藏状态
-    await fetchFavorites()
-    
+    await fetchFavorites();
+
     // 获取各商品的评分统计
-    await fetchProductRatings()
+    await fetchProductRatings();
   } catch (error) {
-    message.error('获取药品列表失败')
+    message.error("获取药品列表失败");
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 获取商品评分统计
 const fetchProductRatings = async () => {
   try {
     // 批量获取商品ID
-    const productIds = products.value.map(p => p.id)
-    if (productIds.length === 0) return
-    
+    const productIds = products.value.map((p) => p.id);
+    if (productIds.length === 0) return;
+
     const res = await request({
       url: `/reviews/ratings`,
-      method: 'get',
+      method: "get",
       params: {
-        productIds: productIds.join(',')
-      }
-    })
-    
+        productIds: productIds.join(","),
+      },
+    });
+
     if (res.code === 200 && res.data) {
       // 更新商品评分信息
-      products.value = products.value.map(product => {
-        const ratingInfo = res.data.find(r => r.productId === product.id)
+      products.value = products.value.map((product) => {
+        const ratingInfo = res.data.find((r) => r.productId === product.id);
         if (ratingInfo) {
           return {
             ...product,
             rating: ratingInfo.averageRating,
-            reviewCount: ratingInfo.reviewCount
-          }
+            reviewCount: ratingInfo.reviewCount,
+          };
         }
-        return product
-      })
+        return product;
+      });
     }
   } catch (error) {
-    console.error('获取商品评分失败:', error)
+    console.error("获取商品评分失败:", error);
     // 错误处理 - 静默失败，不影响主要功能
   }
-}
+};
 
 // 获取产品评价
 const fetchProductReviews = async (productId) => {
-  if (!productId) return
-  
-  reviewsLoading.value = true
+  if (!productId) return;
+
+  reviewsLoading.value = true;
   try {
     const res = await request({
       url: `/reviews/product/${productId}`,
-      method: 'get',
+      method: "get",
       params: {
         page: reviewPagination.current - 1,
-        size: reviewPagination.pageSize
-      }
-    })
-    
+        size: reviewPagination.pageSize,
+      },
+    });
+
     if (res.code === 200) {
-      productReviews.value = res.data || []
-      reviewPagination.total = res.total || productReviews.value.length
+      productReviews.value = res.data || [];
+      reviewPagination.total = res.total || productReviews.value.length;
     }
   } catch (error) {
-    console.error('获取产品评价失败:', error)
+    console.error("获取产品评价失败:", error);
   } finally {
-    reviewsLoading.value = false
+    reviewsLoading.value = false;
   }
-}
+};
 
 // 获取库存状态
 const getStockStatus = (quantity) => {
-  if (quantity <= 0) return '缺货'
-  if (quantity <= 10) return '低库存'
-  return '充足'
-}
+  if (quantity <= 0) return "缺货";
+  if (quantity <= 10) return "低库存";
+  return "充足";
+};
 
 // 获取库存状态颜色
 const getStockStatusColor = (quantity) => {
-  if (quantity <= 0) return 'red'
-  if (quantity <= 10) return 'orange'
-  return 'green'
-}
+  if (quantity <= 0) return "red";
+  if (quantity <= 10) return "orange";
+  return "green";
+};
 
 // 获取库存数量的样式类
 const getStockClass = (quantity) => {
-  if (quantity <= 0) return 'stock-empty'
-  if (quantity <= 10) return 'stock-low'
-  return 'stock-normal'
-}
+  if (quantity <= 0) return "stock-empty";
+  if (quantity <= 10) return "stock-low";
+  return "stock-normal";
+};
 
 // 收藏/取消收藏
 const toggleFavorite = async (product) => {
@@ -390,118 +440,127 @@ const toggleFavorite = async (product) => {
       // 取消收藏
       await request({
         url: `/favorites/${product.id}`,
-        method: 'delete',
+        method: "delete",
         params: {
-          storeId: localStorage.getItem('currentStoreId')
-        }
-      })
-      message.success('已取消收藏')
+          storeId: localStorage.getItem("currentStoreId"),
+        },
+      });
+      message.success("已取消收藏");
     } else {
       // 添加收藏
       await request({
         url: `/favorites/${product.id}`,
-        method: 'post',
+        method: "post",
         params: {
-          storeId: localStorage.getItem('currentStoreId')
-        }
-      })
-      message.success('收藏成功')
+          storeId: localStorage.getItem("currentStoreId"),
+        },
+      });
+      message.success("收藏成功");
     }
     // 更新产品的收藏状态
-    product.isFavorite = !product.isFavorite
+    product.isFavorite = !product.isFavorite;
   } catch (error) {
-    message.error(error.response?.data?.message || '操作失败')
+    message.error(error.response?.data?.message || "操作失败");
   }
-}
+};
 
 // 处理搜索
 const handleSearch = () => {
-  pagination.current = 1
-  fetchProducts()
-}
+  pagination.current = 1;
+  fetchProducts();
+};
 
 // 重置搜索
 const resetSearch = () => {
-  searchForm.keyword = ''
-  searchForm.category = undefined
-  pagination.current = 1
-  fetchProducts()
-}
+  searchForm.keyword = "";
+  searchForm.category = undefined;
+  pagination.current = 1;
+  fetchProducts();
+};
 
 // 显示详情
 const showDetails = (product) => {
-  selectedProduct.value = product
-  detailVisible.value = true
-  
+  selectedProduct.value = product;
+  detailVisible.value = true;
+
   // 重置评价分页
-  reviewPagination.current = 1
-  
+  reviewPagination.current = 1;
+
   // 加载产品评价
-  fetchProductReviews(product.id)
-}
+  fetchProductReviews(product.id);
+};
 
 // 关闭详情
 const closeDetails = () => {
-  detailVisible.value = false
-  selectedProduct.value = null
-  productReviews.value = []
-}
+  detailVisible.value = false;
+  selectedProduct.value = null;
+  productReviews.value = [];
+};
 
 // 加入购物车
 const addToCart = async (product) => {
   if (!product.quantity) {
-    message.warning(`${product.name} 当前无库存`)
-    return
+    message.warning(`${product.name} 当前无库存`);
+    return;
   }
-  
+
   try {
     await request({
-      url: '/cart',
-      method: 'post',
+      url: "/cart",
+      method: "post",
       data: {
         productId: product.id,
-        storeId: localStorage.getItem('currentStoreId'),
-        quantity: 1
-      }
-    })
-    message.success(`已将 ${product.productName} 加入购物车`)
+        storeId: localStorage.getItem("currentStoreId"),
+        quantity: 1,
+      },
+    });
+    message.success(`已将 ${product.productName} 加入购物车`);
   } catch (error) {
     if (error.response?.status === 400) {
-      message.warning(error.response.data.message || '添加失败')
+      message.warning(error.response.data.message || "添加失败");
     } else {
-      message.error('添加失败')
+      message.error("添加失败");
     }
   }
-}
+};
 
 // 处理分页
 const handlePageChange = (page) => {
-  pagination.current = page
-  fetchProducts()
-}
+  pagination.current = page;
+  fetchProducts();
+};
 
 // 处理评价分页
 const handleReviewPageChange = (page) => {
-  reviewPagination.current = page
-  fetchProductReviews(selectedProduct.value?.id)
-}
+  reviewPagination.current = page;
+  fetchProductReviews(selectedProduct.value?.id);
+};
 
 // 初始化
+const isMember = ref(false);
 onMounted(() => {
-  fetchProducts()
-})
+  fetchProducts();
+  request.get("/member/current").then((res) => {
+    isMember.value = res.data.isRegistered;
+  });
+});
 </script>
 
 <style lang="less" scoped>
- .ant-tag {
-    margin-left: 10px;
-  }
+.member-price {
+  font-size: 12px;
+  margin-left: 5px;
+  text-decoration: line-through;
+}
+.ant-tag {
+  margin-left: 10px;
+}
 .products-container {
   padding: 16px;
-  
+
   .search-section {
     margin-bottom: 16px;
-    
+
     .search-card {
       background: rgba(255, 255, 255, 0.8);
       backdrop-filter: blur(10px);
@@ -514,7 +573,7 @@ onMounted(() => {
     .product-card {
       height: 100%;
       transition: all 0.3s;
-      
+
       img {
         height: 200px;
         object-fit: cover;
@@ -538,17 +597,17 @@ onMounted(() => {
         .stock {
           color: #8c8c8c;
           margin-bottom: 8px;
-          
+
           .stock-empty {
             color: #f5222d;
             font-weight: bold;
           }
-          
+
           .stock-low {
             color: #fa8c16;
             font-weight: bold;
           }
-          
+
           .stock-normal {
             color: #52c41a;
             font-weight: bold;
@@ -564,21 +623,21 @@ onMounted(() => {
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
         }
-        
+
         .product-reviews {
           margin-top: 12px;
           display: flex;
           align-items: center;
-          
+
           .review-stars {
             font-size: 14px;
             line-height: 1;
-            
+
             :deep(.ant-rate-star) {
               margin-right: 2px;
             }
           }
-          
+
           .review-count {
             margin-left: 8px;
             color: #8c8c8c;
@@ -592,29 +651,29 @@ onMounted(() => {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        
+
         .ant-btn {
           padding: 0 8px;
-          
+
           &.ant-btn-link {
             color: #595959;
-            
+
             &:hover {
               color: #1890ff;
             }
           }
         }
       }
-      
+
       .card-footer {
         margin-top: 12px;
         border-top: 1px solid #f0f0f0;
         padding-top: 12px;
         text-align: center;
-        
+
         .ant-btn {
           color: #1890ff;
-          
+
           &:hover {
             color: #40a9ff;
             background: #f0f7ff;
@@ -636,7 +695,7 @@ onMounted(() => {
 
   .detail-image {
     flex: 0 0 300px;
-    
+
     img {
       width: 100%;
       border-radius: 8px;
@@ -655,17 +714,17 @@ onMounted(() => {
       margin: 8px 0;
       line-height: 1.6;
     }
-    
+
     .stock-empty {
       color: #f5222d;
       font-weight: bold;
     }
-    
+
     .stock-low {
       color: #fa8c16;
       font-weight: bold;
     }
-    
+
     .stock-normal {
       color: #52c41a;
       font-weight: bold;
@@ -675,37 +734,37 @@ onMounted(() => {
 
 .reviews-section {
   margin-top: 16px;
-  
+
   .reviews-title {
     font-size: 16px;
     font-weight: bold;
     color: #1890ff;
   }
-  
+
   .empty-reviews {
     padding: 24px 0;
     background: #f9f9f9;
     border-radius: 4px;
   }
-  
+
   .reviews-list {
     .review-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      
+
       .review-time {
         color: #8c8c8c;
         font-size: 12px;
       }
     }
-    
+
     .review-content {
       margin: 8px 0;
       color: #262626;
       white-space: pre-wrap;
     }
-    
+
     .review-images {
       display: flex;
       flex-wrap: wrap;
@@ -713,7 +772,7 @@ onMounted(() => {
       margin-top: 8px;
     }
   }
-  
+
   .reviews-pagination {
     text-align: center;
     margin-top: 16px;
@@ -724,11 +783,11 @@ onMounted(() => {
 @media (max-width: 768px) {
   .product-detail {
     flex-direction: column;
-    
+
     .detail-image {
       flex: none;
       width: 100%;
     }
   }
 }
-</style> 
+</style>

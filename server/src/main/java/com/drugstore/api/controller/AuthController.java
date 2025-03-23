@@ -98,6 +98,7 @@ public class AuthController {
         member.setPoints(0);
         member.setTotalSpending(0.0);
         member.setMemberLevel("bronze");
+        member.setIsRegistered(false); // 初始设置为未完成注册
         
         // 生成会员ID
         long count = memberRepository.count();
@@ -119,7 +120,8 @@ public class AuthController {
             savedMember.getPoints(),
             savedMember.getTotalSpending(),
             savedMember.getRegistrationTime() != null ? savedMember.getRegistrationTime().toString() : "",
-            savedMember.getStatus()
+            savedMember.getStatus(),
+            savedMember.getIsRegistered() != null ? savedMember.getIsRegistered() : false
         );
         
         UserInfoResponse userInfo = new UserInfoResponse(

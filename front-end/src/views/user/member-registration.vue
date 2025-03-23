@@ -191,11 +191,12 @@ const handleSubmit = async () => {
       phoneNumber: formData.phoneNumber,
       email: formData.email,
       birthday: formData.birthday ? formData.birthday.format('YYYY-MM-DD') : null,
-      gender: formData.gender
+      gender: formData.gender,
+      isRegistered: true
     }
     
     // 发送请求注册会员
-    const response = await axios.post('/member/register', requestData)
+    const response = await axios.put('/member/current', requestData)
     
     if (response.code === 200) {
       message.success('会员注册成功')

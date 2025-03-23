@@ -12,11 +12,12 @@ public class MemberInfoResponse {
     private Double totalSpending;
     private String registrationTime;
     private String status;
+    private Boolean isRegistered;
 
     public MemberInfoResponse(String memberId, String name, String phoneNumber, String email, 
                              String birthday, String gender, String memberLevel, 
                              Integer points, Double totalSpending, 
-                             String registrationTime, String status) {
+                             String registrationTime, String status, Boolean isRegistered) {
         this.memberId = memberId;
         this.name = name;
         this.phoneNumber = phoneNumber;
@@ -28,6 +29,7 @@ public class MemberInfoResponse {
         this.totalSpending = totalSpending;
         this.registrationTime = registrationTime;
         this.status = status;
+        this.isRegistered = isRegistered;
     }
 
     // Getters and Setters
@@ -117,5 +119,13 @@ public class MemberInfoResponse {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getIsRegistered() {
+        return isRegistered;
+    }
+
+    public void setIsRegistered(Boolean isRegistered) {
+        this.isRegistered = isRegistered;
     }
 } 

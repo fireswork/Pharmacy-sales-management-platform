@@ -27,10 +27,10 @@
             <template #icon><ReloadOutlined /></template>
             重置
           </a-button>
-          <a-button type="primary" @click="handleAdd">
+          <!-- <a-button type="primary" @click="handleAdd">
             <template #icon><PlusOutlined /></template>
             新增会员
-          </a-button>
+          </a-button> -->
         </a-space>
       </div>
 

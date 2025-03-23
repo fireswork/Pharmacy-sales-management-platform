@@ -8,6 +8,7 @@ public class UserUpdateRequest {
     private String email;
     private Date birthday;
     private String gender;
+    private Boolean isRegistered;
 
     // Getters and Setters
     public String getName() {
@@ -48,5 +49,13 @@ public class UserUpdateRequest {
 
     public void setGender(String gender) {
         this.gender = gender;
+    }
+
+    public Boolean getIsRegistered() {
+        return isRegistered;
+    }
+
+    public void setIsRegistered(Boolean isRegistered) {
+        this.isRegistered = isRegistered;
     }
 } 

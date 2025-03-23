@@ -46,6 +46,9 @@ public class Member {
     @Column
     private String status; // 状态
 
+    @Column(name = "is_registered")
+    private Boolean isRegistered; // 是否已经注册
+
     @OneToOne
     @JoinColumn(name = "user_id", unique = true)
     private User user; // 关联的用户
@@ -145,6 +148,14 @@ public class Member {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getIsRegistered() {
+        return isRegistered;
+    }
+
+    public void setIsRegistered(Boolean isRegistered) {
+        this.isRegistered = isRegistered;
     }
 
     public User getUser() {

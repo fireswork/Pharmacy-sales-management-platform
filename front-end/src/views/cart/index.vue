@@ -26,7 +26,10 @@
                 />
                 <div class="product-info">
                   <div class="product-name">{{ item.productName }}</div>
-                  <div class="product-price">¥{{ item.price }}</div>
+                  <div class="product-price">
+                    <span v-if="isMember">¥{{ item.memberPrice }}</span>
+                    <span :class="isMember ? 'member-price' : ''">¥{{ item.price.toFixed(2) }}</span>
+                  </div>
                 </div>
                 <div class="quantity-control">
                   <a-button 
@@ -50,7 +53,7 @@
                     (库存: {{ item.stockQuantity }})
                   </span>
                 </div>
-                <div class="item-total">¥{{ (item.price * item.quantity).toFixed(2) }}</div>
+                <div class="item-total">¥{{ (item.price * item.quantity * (isMember ? 0.9 : 1)).toFixed(2) }}</div>
                 <a-button type="link" danger @click="removeItem(item)">
                   <DeleteOutlined />
                 </a-button>
@@ -113,7 +116,7 @@ const selectedCount = computed(() => {
 const totalAmount = computed(() => {
   return cartItems.value
     .filter(item => item.selected)
-    .reduce((total, item) => total + item.price * item.quantity, 0)
+    .reduce((total, item) => total + item.price * item.quantity * (isMember.value ? 0.9 : 1), 0)
 })
 
 const isAllSelected = computed(() => {
@@ -133,7 +136,10 @@ const fetchCartItems = async () => {
       url: `/cart/store/${localStorage.getItem('currentStoreId')}`,
       method: 'get'
     })
-    cartItems.value = res.data
+    cartItems.value = res.data.map(item => ({
+      ...item,
+      memberPrice: isMember.value ? (item.price * 0.9).toFixed(2) : null
+    }))
   } catch (error) {
     message.error('获取购物车失败')
   } finally {
@@ -258,12 +264,24 @@ const checkout = () => {
 }
 
 // 页面加载时获取购物车数据
+const isMember = ref(false)
 onMounted(() => {
   fetchCartItems()
+  request({
+    url: '/member/current',
+    method: 'get',
+  }).then(res => {
+    isMember.value = res.data.isRegistered
+  })
 })
 </script>
 
 <style lang="less" scoped>
+.member-price {
+  font-size: 12px;
+  margin-left: 5px;
+  text-decoration: line-through;
+}
 .cart-container {
   padding: 16px;
 

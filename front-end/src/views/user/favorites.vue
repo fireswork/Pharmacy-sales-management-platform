@@ -15,7 +15,10 @@
             <div class="product-content">
               <div class="product-header">
                 <h3 class="product-name">{{ item.productName }}</h3>
-                <div class="product-price">¥{{ item.price || '暂无价格' }}</div>
+                <div class="product-price">
+                  <span v-if="isMember">¥{{ (item.price * 0.9).toFixed(2) }}</span>
+                  <span :class="isMember ? 'member-price' : ''">¥{{ item.price?.toFixed(2) }}</span>
+                </div>
               </div>
               
               <div class="product-info">
@@ -193,12 +196,24 @@ const handlePageChange = (page) => {
 }
 
 // 页面加载时获取数据
+const isMember = ref(false)
 onMounted(() => {
   fetchFavorites()
+  request({
+    url: '/member/current',
+    method: 'get',
+  }).then(res => {
+    isMember.value = res.data.isRegistered
+  })
 })
 </script>
 
 <style lang="less" scoped>
+.member-price {
+  font-size: 12px;
+  margin-left: 5px;
+  text-decoration: line-through;
+}
 .favorites-container {
   padding: 16px;
 
