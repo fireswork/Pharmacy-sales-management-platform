@@ -157,6 +157,11 @@
                   <template #icon><CommentOutlined /></template>
                   <router-link to="/home/user/reviews">我的评价</router-link>
                 </a-menu-item>
+
+                <a-menu-item key="memberRegistration">
+                  <template #icon><CrownOutlined /> /></template>
+                  <router-link to="/home/user/memberRegistration">会员注册</router-link>
+                </a-menu-item>
               </template>
             </a-sub-menu>
           </a-menu>

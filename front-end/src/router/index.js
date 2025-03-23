@@ -160,6 +160,14 @@ const router = createRouter({
             title: '仓库管理',
           },
         },
+        {
+          path: 'user/memberRegistration',
+          name: 'memberRegistration',
+          component: () => import('../views/user/member-registration.vue'),
+          meta: {
+            title: '会员注册',
+          },
+        },
       ],
     },
   ],
