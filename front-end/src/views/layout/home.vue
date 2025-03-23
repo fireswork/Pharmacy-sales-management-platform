@@ -14,7 +14,7 @@
                 d="M20,6H16V4A2,2 0 0,0 14,2H10A2,2 0 0,0 8,4V6H4C2.89,6 2,6.89 2,8V19A2,2 0 0,0 4,21H20A2,2 0 0,0 22,19V8C22,6.89 21.1,6 20,6M10,4H14V6H10V4M20,19H4V8H20V19M6,10H8V12H6V10M6,14H8V16H6V14M10,10H18V12H10V10M10,14H15V16H10V14Z"
               />
             </svg>
-            <span v-if="!collapsed">药品管理系统</span>
+            <span v-if="!collapsed">{{ userRole === 'USER' ? '药品商城' : '药品管理系统' }}</span>
           </div>
           <a-select
             v-model:value="currentStoreId"
@@ -36,6 +36,13 @@
                 <template #icon><UserOutlined /></template>
               </a-avatar>
               <span class="username">{{ userInfo?.username || '未登录' }}</span>
+              <span class="user-role">
+                {{ 
+                  userRole === 'ADMIN' ? '(管理员)' : 
+                  userRole === 'EMPLOYEE' ? '(员工)' : 
+                  userRole === 'USER' ? '(会员)' : ''
+                }}
+              </span>
               <DownOutlined />
             </a>
             <template #overlay>
@@ -229,7 +236,7 @@ const loading = ref(false)
 
 // 用户信息相关
 const userInfo = ref(null)
-const userRole = computed(() => userInfo.value?.role?.toUpperCase() || '')
+const userRole = ref(localStorage.getItem('userRole') || '')
 
 // 获取用户信息的方法
 const getUserInfo = async () => {
@@ -547,5 +554,11 @@ const handleResize = () => {
       }
     }
   }
+}
+
+.user-role {
+  font-size: 12px;
+  color: #999;
+  margin-left: 5px;
 }
 </style>

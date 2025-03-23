@@ -62,6 +62,7 @@ public class AuthController {
             String token = jwtTokenUtil.generateToken(user.getUsername());
             Map<String, String> data = new HashMap<>();
             data.put("access_token", token);
+            data.put("role", user.getRole().toUpperCase());
             
             logger.info("Login successful for user: {}", user.getUsername());
             ApiResponse<Object> response = new ApiResponse<>(data, 200, "Login successful");

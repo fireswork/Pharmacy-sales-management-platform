@@ -13,6 +13,15 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin-login',
+      name: 'adminLogin',
+      component: () => import('../views/admin-login.vue'),
+      meta: {
+        title: '员工登录',
+        requiresAuth: false,
+      },
+    },
+    {
       path: '/home',
       component: () => import('../views/layout/home.vue'),
       children: [
@@ -176,9 +185,27 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('access_token')
-  document.title = to.meta.title ? `${to.meta.title} - 药品管理系统` : '药品管理系统'
+  const userRole = localStorage.getItem('userRole')
+  
+  // 设置页面标题
+  if (userRole === 'USER') {
+    document.title = '药品商城'
+  } else if (userRole === 'EMPLOYEE' || userRole === 'ADMIN') {
+    document.title = '药品管理系统'
+  } else {
+    document.title = to.meta.title ? to.meta.title : '药品管理系统'
+  }
 
-  if (to.path.startsWith('/home') && !token) {
+  // 路由重定向逻辑
+  if (to.path === '/') {
+    // 根路径根据用户角色重定向
+    if (token) {
+      next('/home')
+    } else {
+      next('/login')
+    }
+  } else if (to.path.startsWith('/home') && !token) {
+    // 未登录时，访问需要登录的页面重定向到登录页
     next('/login')
   } else {
     next()

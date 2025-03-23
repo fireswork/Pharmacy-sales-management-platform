@@ -15,7 +15,7 @@
           </a-descriptions-item>
           <a-descriptions-item label="角色">
             <a-tag :color="getRoleColor(userInfo.role)">
-              {{ getRoleText(userInfo.role.toLowerCase()) }}
+              {{ isMember ? '会员' : getRoleText(userInfo.role.toLowerCase()) }}
             </a-tag>
           </a-descriptions-item>
         </a-descriptions>
@@ -242,6 +242,9 @@ const formRef = ref(null)
 // 加载状态
 const loading = ref(false)
 
+// 是否为会员
+const isMember = ref(false)
+
 // 表单验证规则
 const rules = {
   name: [
@@ -373,6 +376,7 @@ const fetchMemberInfo = async () => {
 
     if (response.code === 200) {
       memberInfo.value = response.data.content?.[0]
+      isMember.value = memberInfo.value.isRegistered
 
       // 填充表单数据
       formData.name = memberInfo.value.name || ''
@@ -432,6 +436,7 @@ const handleSubmit = async () => {
       response = await axios.put('/employee/current', updateData)
     } else if (userInfo.value.role?.toUpperCase() === 'USER') {
       response = await axios.put('/member/current', updateData)
+      isMember.value = response.data.isRegistered
     } else {
       throw new Error('不支持的用户角色')
     }

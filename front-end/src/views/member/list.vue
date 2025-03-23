@@ -143,13 +143,13 @@
             </a-tag>
           </a-form-item>
           
-          <a-form-item label="当前积分">
+          <!-- <a-form-item label="当前积分">
             <span>{{ formData.points }}</span>
           </a-form-item>
           
           <a-form-item label="累计消费">
             <span>¥{{ formData.totalSpending ? formData.totalSpending.toFixed(2) : '0.00' }}</span>
-          </a-form-item>
+          </a-form-item> -->
         </template>
       </a-form>
     </a-modal>
@@ -284,19 +284,19 @@ const columns = [
     key: 'memberLevel',
     width: 120,
   },
-  {
-    title: '当前积分',
-    dataIndex: ['points'],
-    width: 150,
-  },
-  {
-    title: '累计消费',
-    dataIndex: ['totalSpending'],
-    width: 120,
-    customRender: ({ text }) => {
-      return text ? `¥${text.toFixed(2)}` : '¥0.00'
-    }
-  },
+  // {
+  //   title: '当前积分',
+  //   dataIndex: ['points'],
+  //   width: 150,
+  // },
+  // {
+  //   title: '累计消费',
+  //   dataIndex: ['totalSpending'],
+  //   width: 120,
+  //   customRender: ({ text }) => {
+  //     return text ? `¥${text.toFixed(2)}` : '¥0.00'
+  //   }
+  // },
   {
     title: '注册时间',
     dataIndex: ['registrationTime'],
