@@ -174,11 +174,6 @@
           <a @click="toggleForm" class="text-link">{{
             isLogin ? "没有账号？立即注册" : "已有账号？立即登录"
           }}</a>
-          <div style="margin-top: 10px">
-            <router-link to="/admin-login" class="text-link"
-              >员工/管理员登录入口</router-link
-            >
-          </div>
         </div>
       </div>
     </div>

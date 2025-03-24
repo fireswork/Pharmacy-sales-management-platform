@@ -64,11 +64,6 @@
             </a-button>
           </a-form-item>
         </a-form>
-
-        <!-- 切换入口链接 -->
-        <div class="toggle-container">
-          <router-link to="/login">用户登录入口</router-link>
-        </div>
       </div>
     </div>
   </div>
